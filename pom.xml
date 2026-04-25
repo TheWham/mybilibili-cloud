@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.8</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.mybilibili.cloud</groupId>
+    <artifactId>mybilibili-cloud</artifactId>
+    <version>1.0</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>mybilibili-cloud-base</module>      <!-- 基础模型、枚举、异常、工具类、统一响应 -->
+        <module>mybilibili-cloud-common</module>    <!-- 通用基础设施依赖和跨服务公共能力 -->
+        <module>mybilibili-cloud-gateway</module>   <!-- 统一入口、路由、鉴权拦截、限流、跨域 -->
+        <module>mybilibili-cloud-admin</module>     <!-- 后台管理、统计看板、审核入口、系统配置 -->
+        <module>mybilibili-cloud-user</module>      <!-- 用户资料、关注、用户统计、用户主页 -->
+        <module>mybilibili-cloud-interact</module>  <!-- 点赞、收藏、投币、评论、弹幕、播放历史 -->
+        <module>mybilibili-cloud-search</module>    <!-- Elasticsearch 视频搜索、索引同步 -->
+        <module>mybilibili-cloud-auth</module>      <!-- 登录、注册、Token、管理员登录、权限校验 -->
+        <module>mybilibili-cloud-message</module>   <!-- 用户消息、评论通知、点赞通知、系统通知 -->
+        <module>mybilibili-cloud-media</module>     <!-- 文件存储、图片上传、视频分片、HLS 资源、缩略图生成 -->
+        <module>mybilibili-cloud-api</module>       <!-- 服务间 DTO、Feign Client、事件对象定义 -->
+        <module>mybilibili-cloud-video</module>     <!-- 视频投稿、视频信息、分 P 文件、视频审核、分类 -->
+        <module>mybilibili-cloud-ai</module>        <!-- 关键词生成、语义向量、相似视频召回、FAQ 问答 -->
+    </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <java.version>21</java.version>
+        <skipTests>true</skipTests>
+
+        <!-- Boot 3.2.x 对应 Spring Cloud 2023.0.x，避免混入 2021.x 的旧自动配置。 -->
+        <spring-cloud.version>2023.0.1</spring-cloud.version>
+        <spring-cloud-alibaba.version>2023.0.1.0</spring-cloud-alibaba.version>
+
+        <!-- 这些版本参考单体项目，保持迁移前后的基础组件行为尽量一致。 -->
+        <mybatis.version>3.0.3</mybatis.version>
+        <mysql.version>8.3.0</mysql.version>
+        <aspectjweaver.version>1.9.22</aspectjweaver.version>
+        <fastjson2.version>2.0.53</fastjson2.version>
+        <lombok.version>1.18.32</lombok.version>
+        <captcha.version>1.6.2</captcha.version>
+        <hutool.version>5.8.22</hutool.version>
+        <commons.lang3.version>3.14.0</commons.lang3.version>
+        <commons.csv.version>1.10.0</commons.csv.version>
+        <commons.codec.version>1.17.0</commons.codec.version>
+        <commons.io.version>2.16.1</commons.io.version>
+        <okhttp3.version>4.12.0</okhttp3.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${spring-cloud-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.mybatis.spring.boot</groupId>
+                <artifactId>mybatis-spring-boot-starter</artifactId>
+                <version>${mybatis.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
+                <version>${mysql.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.aspectj</groupId>
+                <artifactId>aspectjweaver</artifactId>
+                <version>${aspectjweaver.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.alibaba.fastjson2</groupId>
+                <artifactId>fastjson2</artifactId>
+                <version>${fastjson2.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-csv</artifactId>
+                <version>${commons.csv.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>${commons.lang3.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>commons-codec</groupId>
+                <artifactId>commons-codec</artifactId>
+                <version>${commons.codec.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>${commons.io.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp</artifactId>
+                <version>${okhttp3.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp-sse</artifactId>
+                <version>${okhttp3.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>com.github.whvcse</groupId>
+                <artifactId>easy-captcha</artifactId>
+                <version>${captcha.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <release>${java.version}</release>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
