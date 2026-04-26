@@ -13,8 +13,8 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  * 后续只需要在 api 模块或本模块补充客户端接口即可。</p>
  */
 @EnableDiscoveryClient
-@EnableFeignClients(basePackages = "com.mybilibili")
-@SpringBootApplication(scanBasePackages = "com.mybilibili")
+@EnableFeignClients(basePackages = {"com.mybilibili.interact", "com.mybilibili.common"})
+@SpringBootApplication(scanBasePackages = {"com.mybilibili.interact", "com.mybilibili.common"})
 public class MyBiliBiliCloudInteractRunApplication {
 
     public static void main(String[] args) {

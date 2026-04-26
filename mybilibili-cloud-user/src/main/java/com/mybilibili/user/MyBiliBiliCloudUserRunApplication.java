@@ -13,8 +13,8 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  * 保持标准微服务配置：注册到 Nacos，并开启 Feign 客户端扫描。</p>
  */
 @EnableDiscoveryClient
-@EnableFeignClients(basePackages = "com.mybilibili")
-@SpringBootApplication(scanBasePackages = "com.mybilibili")
+@EnableFeignClients(basePackages = {"com.mybilibili.user", "com.mybilibili.common"})
+@SpringBootApplication(scanBasePackages = {"com.mybilibili.user", "com.mybilibili.common"})
 public class MyBiliBiliCloudUserRunApplication {
 
     public static void main(String[] args) {

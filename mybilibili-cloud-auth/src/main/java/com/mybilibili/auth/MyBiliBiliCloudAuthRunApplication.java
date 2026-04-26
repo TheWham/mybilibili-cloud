@@ -13,8 +13,8 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  * 客户端扫描，后续新增远程调用接口时不需要再调整启动类。</p>
  */
 @EnableDiscoveryClient
-@EnableFeignClients(basePackages = "com.mybilibili")
-@SpringBootApplication(scanBasePackages = "com.mybilibili")
+@EnableFeignClients(basePackages = {"com.mybilibili.auth", "com.mybilibili.common"})
+@SpringBootApplication(scanBasePackages = {"com.mybilibili.auth", "com.mybilibili.common"})
 public class MyBiliBiliCloudAuthRunApplication {
 
     public static void main(String[] args) {

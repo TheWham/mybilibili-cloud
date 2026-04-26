@@ -13,8 +13,8 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  * Feign 客户端扫描，方便服务间调用统一走接口契约。</p>
  */
 @EnableDiscoveryClient
-@EnableFeignClients(basePackages = "com.mybilibili")
-@SpringBootApplication(scanBasePackages = "com.mybilibili")
+@EnableFeignClients(basePackages = {"com.mybilibili.media", "com.mybilibili.common"})
+@SpringBootApplication(scanBasePackages = {"com.mybilibili.media", "com.mybilibili.common"})
 public class MyBiliBiliCloudMediaRunApplication {
 
     public static void main(String[] args) {

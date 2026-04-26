@@ -13,8 +13,8 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  * 不必反复调整启动类上的扫描范围。</p>
  */
 @EnableDiscoveryClient
-@EnableFeignClients(basePackages = "com.mybilibili")
-@SpringBootApplication(scanBasePackages = "com.mybilibili")
+@EnableFeignClients(basePackages = {"com.mybilibili.message", "com.mybilibili.common"})
+@SpringBootApplication(scanBasePackages = {"com.mybilibili.message", "com.mybilibili.common"})
 public class MyBiliBiliCloudMessageRunApplication {
 
     public static void main(String[] args) {

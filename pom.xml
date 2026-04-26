@@ -28,7 +28,6 @@
         <module>mybilibili-cloud-auth</module>      <!-- 登录、注册、Token、管理员登录、权限校验 -->
         <module>mybilibili-cloud-message</module>   <!-- 用户消息、评论通知、点赞通知、系统通知 -->
         <module>mybilibili-cloud-media</module>     <!-- 文件存储、图片上传、视频分片、HLS 资源、缩略图生成 -->
-        <module>mybilibili-cloud-api</module>       <!-- 服务间 DTO、Feign Client、事件对象定义 -->
         <module>mybilibili-cloud-video</module>     <!-- 视频投稿、视频信息、分 P 文件、视频审核、分类 -->
         <module>mybilibili-cloud-ai</module>        <!-- 关键词生成、语义向量、相似视频召回、FAQ 问答 -->
     </modules>
@@ -38,7 +37,7 @@
         <java.version>21</java.version>
         <skipTests>true</skipTests>
 
-        <!-- Boot 3.2.x 对应 Spring Cloud 2023.0.x，避免混入 2021.x 的旧自动配置。 -->
+        <!-- Boot 3.2.x 对应 Spring Cloud 2023.0.x -->
         <spring-cloud.version>2023.0.1</spring-cloud.version>
         <spring-cloud-alibaba.version>2023.0.1.0</spring-cloud-alibaba.version>
 

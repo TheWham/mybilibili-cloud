@@ -51,7 +51,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>com.mybilibili.gateway.EasyliveCloudGatewayRunApplication</mainClass>
+                    <mainClass>com.mybilibili.gateway.MyBiliBiliCloudGatewayRunApplication</mainClass>
                 </configuration>
             </plugin>
         </plugins>

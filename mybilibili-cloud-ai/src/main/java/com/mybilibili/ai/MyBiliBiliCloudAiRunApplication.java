@@ -13,8 +13,8 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  * 直接按微服务方式注册到 Nacos 并调用其他服务。</p>
  */
 @EnableDiscoveryClient
-@EnableFeignClients(basePackages = "com.mybilibili")
-@SpringBootApplication(scanBasePackages = "com.mybilibili")
+@EnableFeignClients(basePackages = {"com.mybilibili.ai", "com.mybilibili.common"})
+@SpringBootApplication(scanBasePackages = {"com.mybilibili.ai", "com.mybilibili.common"})
 public class MyBiliBiliCloudAiRunApplication {
 
     public static void main(String[] args) {

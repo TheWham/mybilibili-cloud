@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTO Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mybilibili.admin.mappers.CategoryInfoMapper">
+	<!--实体映射 -->
+	<resultMap id="base_result_map" type="com.mybilibili.base.entity.po.CategoryInfo">
+		<!-- 自增分类id-->
+		<id column="category_id" property="categoryId"/>
+		<!-- 分类名称-->
+		<result column="category_name" property="categoryName"/>
+		<!-- 分类编码-->
+		<result column="category_code" property="categoryCode"/>
+		<!-- 父级分类id
+-->
+		<result column="p_category_id" property="pCategoryId"/>
+		<!-- 分类背景图-->
+		<result column="background" property="background"/>
+		<!-- 分类名称图标-->
+		<result column="icon" property="icon"/>
+		<!-- 分类排列优先级-->
+		<result column="sort" property="sort"/>
+	</resultMap>
+
+	<!--通用查询结果列 -->
+	<sql id="base_column_list">
+		category_id,category_name,category_code,p_category_id,background,icon,sort
+	</sql>
+
+	<!--基础查询条件 -->
+	<sql id="base_query_condition">
+		<if test="query.categoryId != null" >
+			and category_id = #{query.categoryId}
+		</if>
+		<if test="query.categoryName != null and query.categoryName != ''" >
+			and category_name = #{query.categoryName}
+		</if>
+		<if test="query.categoryCode != null and query.categoryCode != ''" >
+			and category_code = #{query.categoryCode}
+		</if>
+		<if test="query.pCategoryId != null" >
+			and p_category_id = #{query.pCategoryId}
+		</if>
+		<if test="query.background != null and query.background != ''" >
+			and background = #{query.background}
+		</if>
+		<if test="query.icon != null and query.icon != ''" >
+			and icon = #{query.icon}
+		</if>
+		<if test="query.sort != null" >
+			and sort = #{query.sort}
+		</if>
+	</sql>
+
+	<!--通用条件列 -->
+	<sql id="query_condition">
+		<where>
+			<include refid="base_query_condition" />
+			<include refid="base_query_condition_extend" />
+		</where>
+	</sql>
+
+	<!--拓展查询条件 -->
+	<sql id="base_query_condition_extend">
+		<if test="query.categoryNameFuzzy != null and query.categoryNameFuzzy != ''" >
+			and category_name like concat('%', #{query.categoryNameFuzzy}, '%')
+		</if>
+		<if test="query.categoryCodeFuzzy != null and query.categoryCodeFuzzy != ''" >
+			and category_code like concat('%', #{query.categoryCodeFuzzy}, '%')
+		</if>
+		<if test="query.backgroundFuzzy != null and query.backgroundFuzzy != ''" >
+			and background like concat('%', #{query.backgroundFuzzy}, '%')
+		</if>
+		<if test="query.iconFuzzy != null and query.iconFuzzy != ''" >
+			and icon like concat('%', #{query.iconFuzzy}, '%')
+		</if>
+		<if test="query.categoryIdOrPCategoryId != null">
+			and category_id = #{categoryIdOrPCategoryId} or p_category_id = #{categoryIdOrPCategoryId}
+		</if>
+	</sql>
+
+
+	<!--通用查询列表 -->
+	<select id="selectList" resultMap="base_result_map">
+		SELECT
+		<include refid="base_column_list"/>
+		FROM category_info
+		<include refid="query_condition"/>
+		<if test="query.orderBy!=null">
+			order by ${query.orderBy}
+		</if>
+		<if test="query.simplePage!=null">
+			limit #{query.simplePage.start}, #{query.simplePage.end}
+		</if>
+	</select>
+
+	<!--查询数量 -->
+	<select id="selectCount" resultType="java.lang.Integer">
+		SELECT count(1) FROM category_info
+		<include refid="query_condition"/>
+	</select>
+
+	<!--插入 -->
+	<insert id="insert" parameterType="com.mybilibili.base.entity.po.CategoryInfo">
+		<selectKey keyProperty="bean.categoryId" resultType="Integer" order="AFTER">
+			SELECT LAST_INSERT_ID()
+		</selectKey>
+		INSERT INTO category_info
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="bean.categoryName != null">
+				category_name,
+			</if>
+			<if test="bean.categoryCode != null">
+				category_code,
+			</if>
+			<if test="bean.pCategoryId != null">
+				p_category_id,
+			</if>
+			<if test="bean.background != null">
+				background,
+			</if>
+			<if test="bean.icon != null">
+				icon,
+			</if>
+			<if test="bean.sort != null">
+				sort,
+			</if>
+		</trim>
+		<trim prefix="values (" suffix=")" suffixOverrides=",">
+			<if test="bean.categoryName != null">
+				#{bean.categoryName},
+			</if>
+			<if test="bean.categoryCode != null">
+				#{bean.categoryCode},
+			</if>
+			<if test="bean.pCategoryId != null">
+				#{bean.pCategoryId},
+			</if>
+			<if test="bean.background != null">
+				#{bean.background},
+			</if>
+			<if test="bean.icon != null">
+				#{bean.icon},
+			</if>
+			<if test="bean.sort != null">
+				#{bean.sort},
+			</if>
+		</trim>
+
+	</insert>
+
+	<!--insertOrUpdate 过滤掉了唯一索引字段-->
+	<insert id="insertOrUpdate" parameterType="com.mybilibili.base.entity.po.CategoryInfo">
+		INSERT INTO category_info
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="bean.categoryId != null">
+				category_id,
+			</if>
+			<if test="bean.categoryName != null">
+				category_name,
+			</if>
+			<if test="bean.categoryCode != null">
+				category_code,
+			</if>
+			<if test="bean.pCategoryId != null">
+				p_category_id,
+			</if>
+			<if test="bean.background != null">
+				background,
+			</if>
+			<if test="bean.icon != null">
+				icon,
+			</if>
+			<if test="bean.sort != null">
+				sort,
+			</if>
+		</trim>
+		<trim prefix="values (" suffix=")" suffixOverrides=",">
+			<if test="bean.categoryId != null">
+				#{bean.categoryId},
+			</if>
+			<if test="bean.categoryName != null">
+				#{bean.categoryName},
+			</if>
+			<if test="bean.categoryCode != null">
+				#{bean.categoryCode},
+			</if>
+			<if test="bean.pCategoryId != null">
+				#{bean.pCategoryId},
+			</if>
+			<if test="bean.background != null">
+				#{bean.background},
+			</if>
+			<if test="bean.icon != null">
+				#{bean.icon},
+			</if>
+			<if test="bean.sort != null">
+				#{bean.sort},
+			</if>
+		</trim>
+		on DUPLICATE key update
+		<trim prefix="" suffix="" suffixOverrides=",">
+			<if test="bean.categoryName != null">
+				category_name = VALUES(category_name),
+			</if>
+			<if test="bean.pCategoryId != null">
+				p_category_id = VALUES(p_category_id),
+			</if>
+			<if test="bean.background != null">
+				background = VALUES(background),
+			</if>
+			<if test="bean.icon != null">
+				icon = VALUES(icon),
+			</if>
+			<if test="bean.sort != null">
+				sort = VALUES(sort),
+			</if>
+		</trim>
+	</insert>
+
+	<!--批量添加 -->
+	<insert id="insertBatch" parameterType="com.mybilibili.base.entity.po.CategoryInfo"  useGeneratedKeys="true" keyProperty="categoryId">
+		INSERT INTO category_info(category_id,category_name,category_code,p_category_id,background,icon,sort) values
+		<foreach collection="list" item="item" separator=",">
+			(
+			#{item.categoryId},#{item.categoryName},#{item.categoryCode},#{item.pCategoryId},#{item.background},#{item.icon},#{item.sort}
+			)
+		</foreach>
+	</insert>
+
+	<!--批量新增修改 (没有过滤掉唯一索引字段)-->
+	<insert id="insertOrUpdateBatch" parameterType="com.mybilibili.base.entity.po.CategoryInfo">
+		INSERT INTO category_info(category_id,category_name,category_code,p_category_id,background,icon,sort) values
+		<foreach collection="list" item="item" separator=",">
+			(
+			#{item.categoryId},#{item.categoryName},#{item.categoryCode},#{item.pCategoryId},#{item.background},#{item.icon},#{item.sort}
+			)
+		</foreach>
+		on DUPLICATE key update
+		category_name = VALUES(category_name),p_category_id = VALUES(p_category_id),background = VALUES(background),icon = VALUES(icon),sort = VALUES(sort)
+	</insert>
+
+	<!--根据CategoryId查询 -->
+	<select id="selectByCategoryId" resultMap="base_result_map">
+		select <include refid="base_column_list"/>
+		from category_info where category_id=#{categoryId}
+	</select>
+
+	<!--根据CategoryId删除 -->
+	<delete id="deleteByCategoryId">
+		delete from category_info where category_id=#{categoryId}
+	</delete>
+
+	<!--根据CategoryIdOrPCategoryId删除 -->
+	<delete id="delCategoryRecursion">
+		delete from category_info where category_id=#{categoryIdOrPCategoryId} or p_category_id=#{categoryIdOrPCategoryId}
+	</delete>
+	<!--根据CategoryId更新 -->
+	<update id="updateByCategoryId" parameterType="com.mybilibili.base.entity.po.CategoryInfo">
+		update category_info
+		<set>
+			<if test="bean.categoryId != null">
+				category_id = #{bean.categoryId},
+			</if>
+			<if test="bean.categoryName != null">
+				category_name = #{bean.categoryName},
+			</if>
+			<if test="bean.categoryCode != null">
+				category_code = #{bean.categoryCode},
+			</if>
+			<if test="bean.pCategoryId != null">
+				p_category_id = #{bean.pCategoryId},
+			</if>
+			<if test="bean.background != null">
+				background = #{bean.background},
+			</if>
+			<if test="bean.icon != null">
+				icon = #{bean.icon},
+			</if>
+			<if test="bean.sort != null">
+				sort = #{bean.sort},
+			</if>
+		</set>
+		where category_id=#{categoryId}
+	</update>
+
+	<update id="updateSortBatch" parameterType="list">
+		<foreach collection="categoryList" separator=";" item="category">
+			update category_info
+			<set>
+				<if test="category.sort != null">
+					sort = #{category.sort},
+				</if>
+			</set>
+			where category_id = #{category.categoryId} and p_category_id = #{category.pCategoryId}
+		</foreach>
+	</update>
+
+	<!--根据CategoryCode查询 -->
+	<select id="selectByCategoryCode" resultMap="base_result_map">
+		select <include refid="base_column_list"/>
+		from category_info where category_code=#{categoryCode}
+	</select>
+
+	<!--根据CategoryCode删除 -->
+	<delete id="deleteByCategoryCode">
+		delete from category_info where category_code=#{categoryCode}
+	</delete>
+
+	<!--根据CategoryCode更新 -->
+	<update id="updateByCategoryCode" parameterType="com.mybilibili.base.entity.po.CategoryInfo">
+		update category_info
+		<set>
+			<if test="bean.categoryId != null">
+				category_id = #{bean.categoryId},
+			</if>
+			<if test="bean.categoryName != null">
+				category_name = #{bean.categoryName},
+			</if>
+			<if test="bean.categoryCode != null">
+				category_code = #{bean.categoryCode},
+			</if>
+			<if test="bean.pCategoryId != null">
+				p_category_id = #{bean.pCategoryId},
+			</if>
+			<if test="bean.background != null">
+				background = #{bean.background},
+			</if>
+			<if test="bean.icon != null">
+				icon = #{bean.icon},
+			</if>
+			<if test="bean.sort != null">
+				sort = #{bean.sort},
+			</if>
+		</set>
+		where category_code=#{categoryCode}
+	</update>
+
+
+
+	<!--获取最大sort值 -->
+	<select id="getMaxSort" resultType="java.lang.Integer">
+		select ifnull(max(sort), 0) from category_info where p_category_id = #{pCategoryId}
+	</select>
+
+</mapper>

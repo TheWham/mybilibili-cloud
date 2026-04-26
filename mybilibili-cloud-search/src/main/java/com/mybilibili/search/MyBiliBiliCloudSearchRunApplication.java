@@ -13,8 +13,8 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  * 和索引维护任务预留好基础能力。</p>
  */
 @EnableDiscoveryClient
-@EnableFeignClients(basePackages = "com.mybilibili")
-@SpringBootApplication(scanBasePackages = "com.mybilibili")
+@EnableFeignClients(basePackages = {"com.mybilibili.search", "com.mybilibili.common"})
+@SpringBootApplication(scanBasePackages = {"com.mybilibili.search", "com.mybilibili.common"})
 public class MyBiliBiliCloudSearchRunApplication {
 
     public static void main(String[] args) {

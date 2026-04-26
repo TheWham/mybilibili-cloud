@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTO Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mybilibili.common.mappers.SysSettingMapper">
+	<!--实体映射 -->
+	<resultMap id="base_result_map" type="com.mybilibili.base.entity.po.SysSetting">
+		<!-- -->
+		<id column="id" property="id"/>
+		<!-- 注册送硬币数-->
+		<result column="register_coin_count" property="registerCoinCount"/>
+		<!-- 发布视频送硬币数-->
+		<result column="post_video_coin_count" property="postVideoCoinCount"/>
+		<!-- 单个视频大小MB-->
+		<result column="video_size" property="videoSize"/>
+		<!-- 最大分P数-->
+		<result column="video_p_count" property="videoPCount"/>
+		<!-- 每天发布视频数-->
+		<result column="video_count" property="videoCount"/>
+		<!-- 每天评论数-->
+		<result column="comment_count" property="commentCount"/>
+		<!-- 每天弹幕数-->
+		<result column="danmu_count" property="danmuCount"/>
+		<!-- -->
+		<result column="update_time" property="updateTime"/>
+		<!-- 最后修改人-->
+		<result column="update_by" property="updateBy"/>
+	</resultMap>
+
+	<!--通用查询结果列 -->
+	<sql id="base_column_list">
+		v.id,v.register_coin_count,v.post_video_coin_count,v.video_size,v.video_p_count,v.video_count,v.comment_count,v.danmu_count,v.update_time,v.update_by
+	</sql>
+
+	<!--基础查询条件 -->
+	<sql id="base_query_condition">
+		<if test="query.id != null" >
+			and v.id = #{query.id}
+		</if>
+		<if test="query.registerCoinCount != null" >
+			and v.register_coin_count = #{query.registerCoinCount}
+		</if>
+		<if test="query.postVideoCoinCount != null" >
+			and v.post_video_coin_count = #{query.postVideoCoinCount}
+		</if>
+		<if test="query.videoSize != null" >
+			and v.video_size = #{query.videoSize}
+		</if>
+		<if test="query.videoPCount != null" >
+			and v.video_p_count = #{query.videoPCount}
+		</if>
+		<if test="query.videoCount != null" >
+			and v.video_count = #{query.videoCount}
+		</if>
+		<if test="query.commentCount != null" >
+			and v.comment_count = #{query.commentCount}
+		</if>
+		<if test="query.danmuCount != null" >
+			and v.danmu_count = #{query.danmuCount}
+		</if>
+		<if test="query.updateTime != null and query.updateTime != ''" >
+			<![CDATA[ and v.update_time=str_to_date(#{query.updateTime}, '%Y-%m-%d') ]]>
+		</if>
+		<if test="query.updateBy != null and query.updateBy != ''" >
+			and v.update_by = #{query.updateBy}
+		</if>
+	</sql>
+
+	<!--通用条件列 -->
+	<sql id="query_condition">
+		<where>
+			<include refid="base_query_condition" />
+			<include refid="base_query_condition_extend" />
+		</where>
+	</sql>
+
+	<!--拓展查询条件 -->
+	<sql id="base_query_condition_extend">
+		<if test="query.updateTimeStart != null and query.updateTimeStart != ''" >
+			<![CDATA[ and v.update_time >= str_to_date(#{query.updateTimeStart}, '%Y-%m-%d')]]>
+		</if>
+		<if test="query.updateTimeEnd != null and query.updateTimeEnd != ''" >
+			<![CDATA[ and v.update_time <= DATE_SUB(str_to_date(#{query.updateTimeEnd}, '%Y-%m-%d'), INTERVAL 1 DAY)]]>
+		</if>
+		<if test="query.updateByFuzzy != null and query.updateByFuzzy != ''" >
+			and v.update_by like concat('%', #{query.updateByFuzzy}, '%')
+		</if>
+	</sql>
+
+	<!--通用查询列表 -->
+	<select id="selectList" resultMap="base_result_map">
+		SELECT
+		<include refid="base_column_list"/>
+		FROM sys_setting v 
+		<include refid="query_condition"/>
+		<if test="query.orderBy!=null">
+			order by ${query.orderBy}
+		</if>
+		<if test="query.simplePage!=null">
+			limit #{query.simplePage.start}, #{query.simplePage.end}
+		</if>
+	</select>
+
+	<!--查询数量 -->
+	<select id="selectCount" resultType="java.lang.Integer">
+		SELECT count(1) FROM sys_setting v 
+		<include refid="query_condition"/>
+	</select>
+
+	<!--插入 -->
+	<insert id="insert" parameterType="com.mybilibili.base.entity.po.SysSetting">
+		<selectKey keyProperty="bean.id" resultType="Long" order="AFTER">
+			SELECT LAST_INSERT_ID()
+		</selectKey>
+		INSERT INTO sys_setting
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="bean.id != null">
+				id,
+			</if>
+			<if test="bean.registerCoinCount != null">
+				register_coin_count,
+			</if>
+			<if test="bean.postVideoCoinCount != null">
+				post_video_coin_count,
+			</if>
+			<if test="bean.videoSize != null">
+				video_size,
+			</if>
+			<if test="bean.videoPCount != null">
+				video_p_count,
+			</if>
+			<if test="bean.videoCount != null">
+				video_count,
+			</if>
+			<if test="bean.commentCount != null">
+				comment_count,
+			</if>
+			<if test="bean.danmuCount != null">
+				danmu_count,
+			</if>
+			<if test="bean.updateTime != null">
+				update_time,
+			</if>
+			<if test="bean.updateBy != null">
+				update_by,
+			</if>
+		</trim>
+		<trim prefix="values (" suffix=")" suffixOverrides=",">
+			<if test="bean.id != null">
+				#{bean.id},
+			</if>
+			<if test="bean.registerCoinCount != null">
+				#{bean.registerCoinCount},
+			</if>
+			<if test="bean.postVideoCoinCount != null">
+				#{bean.postVideoCoinCount},
+			</if>
+			<if test="bean.videoSize != null">
+				#{bean.videoSize},
+			</if>
+			<if test="bean.videoPCount != null">
+				#{bean.videoPCount},
+			</if>
+			<if test="bean.videoCount != null">
+				#{bean.videoCount},
+			</if>
+			<if test="bean.commentCount != null">
+				#{bean.commentCount},
+			</if>
+			<if test="bean.danmuCount != null">
+				#{bean.danmuCount},
+			</if>
+			<if test="bean.updateTime != null">
+				#{bean.updateTime},
+			</if>
+			<if test="bean.updateBy != null">
+				#{bean.updateBy},
+			</if>
+		</trim>
+
+	</insert>
+
+	<!--insertOrUpdate 过滤掉了唯一索引字段-->
+	<insert id="insertOrUpdate" parameterType="com.mybilibili.base.entity.po.SysSetting">
+		INSERT INTO sys_setting
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="bean.id != null">
+				id,
+			</if>
+			<if test="bean.registerCoinCount != null">
+				register_coin_count,
+			</if>
+			<if test="bean.postVideoCoinCount != null">
+				post_video_coin_count,
+			</if>
+			<if test="bean.videoSize != null">
+				video_size,
+			</if>
+			<if test="bean.videoPCount != null">
+				video_p_count,
+			</if>
+			<if test="bean.videoCount != null">
+				video_count,
+			</if>
+			<if test="bean.commentCount != null">
+				comment_count,
+			</if>
+			<if test="bean.danmuCount != null">
+				danmu_count,
+			</if>
+			<if test="bean.updateTime != null">
+				update_time,
+			</if>
+			<if test="bean.updateBy != null">
+				update_by,
+			</if>
+		</trim>
+		<trim prefix="values (" suffix=")" suffixOverrides=",">
+			<if test="bean.id != null">
+				#{bean.id},
+			</if>
+			<if test="bean.registerCoinCount != null">
+				#{bean.registerCoinCount},
+			</if>
+			<if test="bean.postVideoCoinCount != null">
+				#{bean.postVideoCoinCount},
+			</if>
+			<if test="bean.videoSize != null">
+				#{bean.videoSize},
+			</if>
+			<if test="bean.videoPCount != null">
+				#{bean.videoPCount},
+			</if>
+			<if test="bean.videoCount != null">
+				#{bean.videoCount},
+			</if>
+			<if test="bean.commentCount != null">
+				#{bean.commentCount},
+			</if>
+			<if test="bean.danmuCount != null">
+				#{bean.danmuCount},
+			</if>
+			<if test="bean.updateTime != null">
+				#{bean.updateTime},
+			</if>
+			<if test="bean.updateBy != null">
+				#{bean.updateBy},
+			</if>
+		</trim>
+		on DUPLICATE key update
+		<trim prefix="" suffix="" suffixOverrides=",">
+			<if test="bean.registerCoinCount != null">
+				register_coin_count = VALUES(register_coin_count),
+			</if>
+			<if test="bean.postVideoCoinCount != null">
+				post_video_coin_count = VALUES(post_video_coin_count),
+			</if>
+			<if test="bean.videoSize != null">
+				video_size = VALUES(video_size),
+			</if>
+			<if test="bean.videoPCount != null">
+				video_p_count = VALUES(video_p_count),
+			</if>
+			<if test="bean.videoCount != null">
+				video_count = VALUES(video_count),
+			</if>
+			<if test="bean.commentCount != null">
+				comment_count = VALUES(comment_count),
+			</if>
+			<if test="bean.danmuCount != null">
+				danmu_count = VALUES(danmu_count),
+			</if>
+			<if test="bean.updateTime != null">
+				update_time = VALUES(update_time),
+			</if>
+			<if test="bean.updateBy != null">
+				update_by = VALUES(update_by),
+			</if>
+		</trim>
+	</insert>
+
+	<!--批量添加 -->
+	<insert id="insertBatch" parameterType="com.mybilibili.base.entity.po.SysSetting"  useGeneratedKeys="true" keyProperty="id">
+		INSERT INTO sys_setting(id,register_coin_count,post_video_coin_count,video_size,video_p_count,video_count,comment_count,danmu_count,update_time,update_by) values
+		<foreach collection="list" item="item" separator=",">
+			(
+			#{item.id},#{item.registerCoinCount},#{item.postVideoCoinCount},#{item.videoSize},#{item.videoPCount},#{item.videoCount},#{item.commentCount},#{item.danmuCount},#{item.updateTime},#{item.updateBy}
+			)
+		</foreach>
+	</insert>
+
+	<!--批量新增修改 (没有过滤掉唯一索引字段)-->
+	<insert id="insertOrUpdateBatch" parameterType="com.mybilibili.base.entity.po.SysSetting">
+		INSERT INTO sys_setting(id,register_coin_count,post_video_coin_count,video_size,video_p_count,video_count,comment_count,danmu_count,update_time,update_by) values
+		<foreach collection="list" item="item" separator=",">
+			(
+			#{item.id},#{item.registerCoinCount},#{item.postVideoCoinCount},#{item.videoSize},#{item.videoPCount},#{item.videoCount},#{item.commentCount},#{item.danmuCount},#{item.updateTime},#{item.updateBy}
+			)
+		</foreach>
+		on DUPLICATE key update
+		register_coin_count = VALUES(register_coin_count),post_video_coin_count = VALUES(post_video_coin_count),video_size = VALUES(video_size),video_p_count = VALUES(video_p_count),video_count = VALUES(video_count),comment_count = VALUES(comment_count),danmu_count = VALUES(danmu_count),update_time = VALUES(update_time),update_by = VALUES(update_by)
+	</insert>
+
+	<!--根据Id查询 -->
+	<select id="selectById" resultMap="base_result_map">
+		select <include refid="base_column_list"/>
+		from sys_setting v where id=#{id}
+	</select>
+
+	<!--根据Id删除 -->
+	<delete id="deleteById">
+		delete from sys_setting where id=#{id}
+	</delete>
+
+	<!--根据Id更新 -->
+	<update id="updateById" parameterType="com.mybilibili.base.entity.po.SysSetting">
+		update sys_setting
+		<set>
+			<if test="bean.id != null">
+				id = #{bean.id},
+			</if>
+			<if test="bean.registerCoinCount != null">
+				register_coin_count = #{bean.registerCoinCount},
+			</if>
+			<if test="bean.postVideoCoinCount != null">
+				post_video_coin_count = #{bean.postVideoCoinCount},
+			</if>
+			<if test="bean.videoSize != null">
+				video_size = #{bean.videoSize},
+			</if>
+			<if test="bean.videoPCount != null">
+				video_p_count = #{bean.videoPCount},
+			</if>
+			<if test="bean.videoCount != null">
+				video_count = #{bean.videoCount},
+			</if>
+			<if test="bean.commentCount != null">
+				comment_count = #{bean.commentCount},
+			</if>
+			<if test="bean.danmuCount != null">
+				danmu_count = #{bean.danmuCount},
+			</if>
+			<if test="bean.updateTime != null">
+				update_time = #{bean.updateTime},
+			</if>
+			<if test="bean.updateBy != null">
+				update_by = #{bean.updateBy},
+			</if>
+		</set>
+		where id=#{id}
+	</update>
+
+
+
+</mapper>
