@@ -38,7 +38,7 @@
         <java.version>21</java.version>
         <skipTests>true</skipTests>
 
-        <!-- Boot 3.2.x 对应 Spring Cloud 2023.0.x，避免混入 2021.x 的旧自动配置。 -->
+        <!-- Boot 3.2.x 对应 Spring Cloud 2023.0.x -->
         <spring-cloud.version>2023.0.1</spring-cloud.version>
         <spring-cloud-alibaba.version>2023.0.1.0</spring-cloud-alibaba.version>
 

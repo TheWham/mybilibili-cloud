@@ -13,9 +13,9 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
  */
 @EnableDiscoveryClient
 @SpringBootApplication(scanBasePackages = "com.mybilibili")
-public class EasyliveCloudGatewayRunApplication {
+public class MyBiliBiliCloudGatewayRunApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(EasyliveCloudGatewayRunApplication.class, args);
+        SpringApplication.run(MyBiliBiliCloudGatewayRunApplication.class, args);
     }
 }

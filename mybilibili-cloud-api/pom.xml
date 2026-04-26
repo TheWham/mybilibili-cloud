@@ -13,20 +13,20 @@
     <dependencies>
         <dependency>
             <groupId>com.mybilibili.cloud</groupId>
-            <artifactId>mybilibili-cloud-common</artifactId>
+            <artifactId>mybilibili-cloud-base</artifactId>
             <version>1.0</version>
         </dependency>
 
+        <!-- Feign 注解 + 负载均衡 -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
+
     </dependencies>
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <mainClass>com.mybilibili.api.MyBiliBiliCloudApiRunApplication</mainClass>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
 </project>
