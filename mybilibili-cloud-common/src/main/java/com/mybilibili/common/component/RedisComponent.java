@@ -14,6 +14,7 @@ import com.mybilibili.common.redis.RedisUtils;
 import com.mybilibili.common.services.SysSettingService;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotEmpty;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
 
@@ -32,7 +33,7 @@ public class RedisComponent {
 
     @Resource
     public RedisUtils redisUtils;
-    @Resource
+    @Autowired(required = false)
     private SysSettingService sysSettingService;
 
 //TODO redisComponent 需要拆分各自模块中 目前暂时融合在一起

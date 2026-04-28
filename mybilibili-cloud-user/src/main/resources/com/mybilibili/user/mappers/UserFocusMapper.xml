@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTO Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mybilibili.user.mappers.UserFocusMapper">
+	<!--实体映射 -->
+	<resultMap id="base_result_map" type="com.mybilibili.user.entity.po.UserFocus">
+		<!-- 用户id-->
+		<result column="user_id" property="userId"/>
+		<!-- 关注用户id-->
+		<result column="user_focus_id" property="userFocusId"/>
+		<!-- 关注时间-->
+		<result column="focus_time" property="focusTime"/>
+	</resultMap>
+
+	<!--通用查询结果列 -->
+	<sql id="base_column_list">
+		v.user_id,v.user_focus_id,v.focus_time
+	</sql>
+
+	<!--基础查询条件 -->
+	<sql id="base_query_condition">
+		<if test="query.userId != null and query.userId != ''" >
+			and v.user_id = #{query.userId}
+		</if>
+		<if test="query.userFocusId != null and query.userFocusId != ''" >
+			and v.user_focus_id = #{query.userFocusId}
+		</if>
+		<if test="query.focusTime != null and query.focusTime != ''" >
+			<![CDATA[ and v.focus_time=str_to_date(#{query.focusTime}, '%Y-%m-%d') ]]>
+		</if>
+	</sql>
+
+	<!--通用条件列 -->
+	<sql id="query_condition">
+		<where>
+			<include refid="base_query_condition" />
+			<include refid="base_query_condition_extend" />
+		</where>
+	</sql>
+
+	<!--拓展查询条件 -->
+	<sql id="base_query_condition_extend">
+		<if test="query.userIdFuzzy != null and query.userIdFuzzy != ''" >
+			and v.user_id like concat('%', #{query.userIdFuzzy}, '%')
+		</if>
+		<if test="query.userFocusIdFuzzy != null and query.userFocusIdFuzzy != ''" >
+			and v.user_focus_id like concat('%', #{query.userFocusIdFuzzy}, '%')
+		</if>
+		<if test="query.focusTimeStart != null and query.focusTimeStart != ''" >
+			<![CDATA[ and v.focus_time >= str_to_date(#{query.focusTimeStart}, '%Y-%m-%d')]]>
+		</if>
+		<if test="query.focusTimeEnd != null and query.focusTimeEnd != ''" >
+			<![CDATA[ and v.focus_time <= DATE_SUB(str_to_date(#{query.focusTimeEnd}, '%Y-%m-%d'), INTERVAL 1 DAY)]]>
+		</if>
+	</sql>
+
+	<!--通用查询列表 -->
+	<select id="selectList" resultMap="base_result_map">
+		SELECT
+		<include refid="base_column_list"/>
+		<if test="query.isQueryFansDetailInfo || query.isQueryFocusDetailInfo">
+		    ,u.user_id otherUserId
+		    ,u.avatar otherAvatar
+		    ,u.nick_name otherNickName
+		    ,u.person_introduction otherPersonIntroduction
+			-- 判断是否互关的标识列：如果反向关系存在，返回 1 (互关)，否则返回 0 (单向)
+			,IF(v2.user_id IS NOT NULL, 1, 0) AS focusType
+		</if>
+		FROM user_focus v
+		<if test="query.isQueryFansDetailInfo">
+		inner JOIN user_info u on u.user_id = v.user_id
+		</if>
+		<if test="query.isQueryFocusDetailInfo">
+		inner JOIN user_info u on u.user_id = v.user_focus_id
+		</if>
+		<if test="query.isQueryFansDetailInfo || query.isQueryFocusDetailInfo">
+		LEFT JOIN user_focus v2 on v2.user_id = v.user_focus_id AND v2.user_focus_id = v.user_id
+		</if>
+		<include refid="query_condition"/>
+		<if test="query.orderBy!=null">
+			order by ${query.orderBy}
+		</if>
+		<if test="query.simplePage!=null">
+			limit #{query.simplePage.start}, #{query.simplePage.end}
+		</if>
+	</select>
+
+	<select id="selectHaveFocus" resultType="java.lang.Integer">
+		SELECT COUNT(1)
+		FROM user_focus
+		WHERE user_id = #{userId}
+		  AND user_focus_id = #{focusUserId}
+		LIMIT 1
+	</select>
+
+	<!--查询数量 -->
+	<select id="selectCount" resultType="java.lang.Integer">
+		SELECT count(1) FROM user_focus v 
+		<include refid="query_condition"/>
+	</select>
+
+	<!--插入 -->
+	<insert id="insert" parameterType="com.mybilibili.user.entity.po.UserFocus">
+		INSERT INTO user_focus
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="bean.userId != null">
+				user_id,
+			</if>
+			<if test="bean.userFocusId != null">
+				user_focus_id,
+			</if>
+			<if test="bean.focusTime != null">
+				focus_time,
+			</if>
+		</trim>
+		<trim prefix="values (" suffix=")" suffixOverrides=",">
+			<if test="bean.userId != null">
+				#{bean.userId},
+			</if>
+			<if test="bean.userFocusId != null">
+				#{bean.userFocusId},
+			</if>
+			<if test="bean.focusTime != null">
+				#{bean.focusTime},
+			</if>
+		</trim>
+	</insert>
+
+	<!--插入 -->
+	<insert id="insertIgnore" parameterType="com.mybilibili.user.entity.po.UserFocus">
+		INSERT IGNORE INTO user_focus
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="bean.userId != null">
+				user_id,
+			</if>
+			<if test="bean.userFocusId != null">
+				user_focus_id,
+			</if>
+			<if test="bean.focusTime != null">
+				focus_time,
+			</if>
+		</trim>
+		<trim prefix="values (" suffix=")" suffixOverrides=",">
+			<if test="bean.userId != null">
+				#{bean.userId},
+			</if>
+			<if test="bean.userFocusId != null">
+				#{bean.userFocusId},
+			</if>
+			<if test="bean.focusTime != null">
+				#{bean.focusTime},
+			</if>
+		</trim>
+
+	</insert>
+
+	<!--insertOrUpdate 过滤掉了唯一索引字段-->
+	<insert id="insertOrUpdate" parameterType="com.mybilibili.user.entity.po.UserFocus">
+		INSERT INTO user_focus
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="bean.userId != null">
+				user_id,
+			</if>
+			<if test="bean.userFocusId != null">
+				user_focus_id,
+			</if>
+			<if test="bean.focusTime != null">
+				focus_time,
+			</if>
+		</trim>
+		<trim prefix="values (" suffix=")" suffixOverrides=",">
+			<if test="bean.userId != null">
+				#{bean.userId},
+			</if>
+			<if test="bean.userFocusId != null">
+				#{bean.userFocusId},
+			</if>
+			<if test="bean.focusTime != null">
+				#{bean.focusTime},
+			</if>
+		</trim>
+		on DUPLICATE key update
+		<trim prefix="" suffix="" suffixOverrides=",">
+			<if test="bean.focusTime != null">
+				focus_time = VALUES(focus_time),
+			</if>
+		</trim>
+	</insert>
+
+	<!--批量添加 -->
+	<insert id="insertBatch" parameterType="com.mybilibili.user.entity.po.UserFocus"  useGeneratedKeys="true" keyProperty="userId">
+		INSERT INTO user_focus(user_id,user_focus_id,focus_time) values
+		<foreach collection="list" item="item" separator=",">
+			(
+			#{item.userId},#{item.userFocusId},#{item.focusTime}
+			)
+		</foreach>
+	</insert>
+
+	<!--批量新增修改 (没有过滤掉唯一索引字段)-->
+	<insert id="insertOrUpdateBatch" parameterType="com.mybilibili.user.entity.po.UserFocus">
+		INSERT INTO user_focus(user_id,user_focus_id,focus_time) values
+		<foreach collection="list" item="item" separator=",">
+			(
+			#{item.userId},#{item.userFocusId},#{item.focusTime}
+			)
+		</foreach>
+		on DUPLICATE key update
+		focus_time = VALUES(focus_time)
+	</insert>
+
+	<!--根据UserIdAndUserFocusIdAnd查询 -->
+	<select id="selectByUserIdAndUserFocusId" resultMap="base_result_map">
+		select <include refid="base_column_list"/>
+		from user_focus v where user_id=#{userId} and user_focus_id=#{userFocusId}
+	</select>
+
+	<!--根据UserIdAndUserFocusIdAnd删除 -->
+	<delete id="deleteByUserIdAndUserFocusId">
+		delete from user_focus where user_id=#{userId} and user_focus_id=#{userFocusId}
+	</delete>
+
+	<!--根据UserIdAndUserFocusIdAnd更新 -->
+	<update id="updateByUserIdAndUserFocusId" parameterType="com.mybilibili.user.entity.po.UserFocus">
+		update user_focus
+		<set>
+			<if test="bean.userId != null">
+				user_id = #{bean.userId},
+			</if>
+			<if test="bean.userFocusId != null">
+				user_focus_id = #{bean.userFocusId},
+			</if>
+			<if test="bean.focusTime != null">
+				focus_time = #{bean.focusTime},
+			</if>
+		</set>
+		where user_id=#{userId} and user_focus_id=#{userFocusId}
+	</update>
+
+
+
+</mapper>

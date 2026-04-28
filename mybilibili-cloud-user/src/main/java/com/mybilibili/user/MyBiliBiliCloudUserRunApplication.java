@@ -1,5 +1,6 @@
 package com.mybilibili.user;
 
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
@@ -15,6 +16,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = {"com.mybilibili.user", "com.mybilibili.common"})
 @SpringBootApplication(scanBasePackages = {"com.mybilibili.user", "com.mybilibili.common"})
+@MapperScan({"com.mybilibili.user.mappers", "com.mybilibili.common.mappers"})
 public class MyBiliBiliCloudUserRunApplication {
 
     public static void main(String[] args) {

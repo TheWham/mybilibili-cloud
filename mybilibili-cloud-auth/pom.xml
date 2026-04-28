@@ -22,6 +22,13 @@
             <artifactId>lombok</artifactId>
         </dependency>
 
+        <!-- Nashorn JS引擎, easy-captcha依赖 -->
+        <dependency>
+            <groupId>org.openjdk.nashorn</groupId>
+            <artifactId>nashorn-core</artifactId>
+            <version>15.4</version>
+        </dependency>
+
     </dependencies>
     <build>
         <plugins>

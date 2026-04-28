@@ -18,10 +18,24 @@ spring:
 
     gateway:
       routes:
+        - id: auth
+          uri: lb://mybilibili-cloud-auth
+          predicates:
+            - Path=/web/account/**
+          filters:
+            - StripPrefix=1
+
+        - id: user
+          uri: lb://mybilibili-cloud-user
+          predicates:
+            - Path=/web/uHome/**,/web/ucenter/**,/web/user/**
+          filters:
+            - StripPrefix=1
+
         - id: video
           uri: lb://mybilibili-cloud-video
           predicates:
-            - Path=/web/**
+            - Path=/web/video/**,/web/file/**,/web/category/**
           filters:
             - StripPrefix=1
 
