@@ -15,7 +15,6 @@
         <dependency>
             <groupId>com.mybilibili.cloud</groupId>
             <artifactId>mybilibili-cloud-base</artifactId>
-            <version>1.0</version>
         </dependency>
 
         <dependency>

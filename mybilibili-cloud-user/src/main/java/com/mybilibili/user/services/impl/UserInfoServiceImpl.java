@@ -11,16 +11,17 @@ import com.mybilibili.base.entity.query.UserFocusQuery;
 import com.mybilibili.base.entity.query.UserInfoQuery;
 import com.mybilibili.base.entity.query.UserStatsQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
+import com.mybilibili.base.entity.vo.UserCountVO;
 import com.mybilibili.base.entity.vo.UserInfoVO;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.enums.ResponseCodeEnum;
 import com.mybilibili.base.enums.UserStatsRedisEnum;
 import com.mybilibili.base.exception.BusinessException;
-import com.mybilibili.common.component.RedisComponent;
+import com.mybilibili.common.component.TokenRedisComponent;
+import com.mybilibili.user.component.UserRedisComponent;
 import com.mybilibili.user.component.UserStatsCacheAsyncComponent;
 import com.mybilibili.user.entity.po.UserFocus;
 import com.mybilibili.user.entity.po.UserInfo;
-import com.mybilibili.user.entity.vo.UserCountVO;
 import com.mybilibili.user.enums.StatusEnum;
 import com.mybilibili.user.mappers.UserFocusMapper;
 import com.mybilibili.user.mappers.UserInfoMapper;
@@ -50,7 +51,9 @@ public class UserInfoServiceImpl implements UserInfoService {
     @Resource
     private UserFocusMapper<UserFocus, UserFocusQuery> userFocusMapper;
     @Resource
-    private RedisComponent redisComponent;
+    private TokenRedisComponent tokenRedisComponent;
+    @Resource
+    private UserRedisComponent userRedisComponent;
     @Resource
     private UserStatsCacheAsyncComponent userStatsCacheAsyncComponent;
     @Resource
@@ -160,15 +163,15 @@ public class UserInfoServiceImpl implements UserInfoService {
         this.userInfoMapper.updateByUserId(userInfo, userInfo.getUserId());
 
         TokenUserInfoDTO tokenUserInfoDTO = BeanUtil.toBean(userInfo, TokenUserInfoDTO.class);
-        redisComponent.saveTokenUserInfo(tokenUserInfoDTO);
+        tokenRedisComponent.saveTokenUserInfo(tokenUserInfoDTO);
 
         String userId = userInfo.getUserId();
-        String tokenId = redisComponent.getTokenIdByUserId(userId);
+        String tokenId = tokenRedisComponent.getTokenIdByUserId(userId);
         if (tokenId != null) {
-            redisComponent.cleanExistToken(userId);
+            tokenRedisComponent.cleanExistToken(userId);
         }
-        redisComponent.saveTokenIdByUserId(userInfo.getUserId(), tokenUserInfoDTO.getTokenId());
-        redisComponent.refreshRealtimeUserStatsExpire(userInfo.getUserId());
+        tokenRedisComponent.saveTokenIdByUserId(userInfo.getUserId(), tokenUserInfoDTO.getTokenId());
+        userRedisComponent.refreshRealtimeUserStatsExpire(userInfo.getUserId());
         userStatsCacheAsyncComponent.refreshRealtimeUserStatsCache(userInfo.getUserId());
         return tokenUserInfoDTO;
     }
@@ -182,9 +185,9 @@ public class UserInfoServiceImpl implements UserInfoService {
     @Override
     public void setUserInHome(UserInfoVO userInfoVO) {
         String userId = userInfoVO.getUserId();
-        HashMap<String, Integer> realtimeStatsMap = redisComponent.getRealtimeUserStatsInfo(userId);
+        HashMap<String, Integer> realtimeStatsMap = userRedisComponent.getRealtimeUserStatsInfo(userId);
         if (realtimeStatsMap != null && !realtimeStatsMap.isEmpty()) {
-            redisComponent.refreshRealtimeUserStatsExpire(userId);
+            userRedisComponent.refreshRealtimeUserStatsExpire(userId);
             fillUserInfoVOWithRealtimeStats(userInfoVO, realtimeStatsMap);
             return;
         }
@@ -249,7 +252,7 @@ public class UserInfoServiceImpl implements UserInfoService {
             tokenUserInfoDTO.setNickName(userInfo.getNickName());
             tokenUserInfoDTO.setPersonIntroduction(userInfo.getPersonIntroduction());
             tokenUserInfoDTO.setAvatar(userInfo.getAvatar());
-            redisComponent.updateTokenUserInfo(tokenUserInfoDTO);
+            tokenRedisComponent.updateTokenUserInfo(tokenUserInfoDTO);
         }
     }
 
@@ -267,9 +270,9 @@ public class UserInfoServiceImpl implements UserInfoService {
 
     @Override
     public UserCountVO getUserCountInfo(String userId) {
-        HashMap<String, Integer> userStatsMap = redisComponent.getRealtimeUserStatsInfo(userId);
+        HashMap<String, Integer> userStatsMap = userRedisComponent.getRealtimeUserStatsInfo(userId);
         if (userStatsMap != null && !userStatsMap.isEmpty()) {
-            redisComponent.refreshRealtimeUserStatsExpire(userId);
+            userRedisComponent.refreshRealtimeUserStatsExpire(userId);
             return buildUserCountVOFromRedis(userStatsMap);
         }
 
@@ -348,7 +351,7 @@ public class UserInfoServiceImpl implements UserInfoService {
         }
 
         if (StatusEnum.DISABLE.equals(statusEnum)) {
-            redisComponent.cleanUserLoginToken(userId);
+            tokenRedisComponent.cleanUserLoginToken(userId);
         }
         return updateCount;
     }

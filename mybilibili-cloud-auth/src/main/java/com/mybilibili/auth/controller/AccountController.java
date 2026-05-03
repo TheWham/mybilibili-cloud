@@ -1,13 +1,16 @@
 package com.mybilibili.auth.controller;
 
 import com.mybilibili.auth.consumer.UserLoginClient;
+import com.mybilibili.auth.component.AuthRedisComponent;
 import com.mybilibili.base.entity.dto.RegisterDTO;
 import com.mybilibili.base.entity.dto.WebLoginDTO;
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
 import com.mybilibili.base.entity.vo.ResponseVO;
+import com.mybilibili.base.entity.vo.UserCountVO;
 import com.mybilibili.base.exception.BusinessException;
-import com.mybilibili.common.component.RedisComponent;
+import com.mybilibili.common.annotation.LoginInterceptor;
+import com.mybilibili.common.component.TokenRedisComponent;
 import com.mybilibili.common.controller.ABaseController;
 import com.wf.captcha.ArithmeticCaptcha;
 import jakarta.annotation.Resource;
@@ -32,10 +35,10 @@ public class AccountController extends ABaseController {
     private UserLoginClient userLoginClient;
 
     @Resource
-    private RedisComponent redisComponent;
-    //TODO autoLogin 刷新用户状态
-   // @Resource
-   // private UserStatsCacheAsyncComponent userStatsCacheAsyncComponent;
+    private AuthRedisComponent authRedisComponent;
+
+    @Resource
+    private TokenRedisComponent tokenRedisComponent;
 
 /**
  * 获取验证码接口
@@ -53,7 +56,7 @@ public class AccountController extends ABaseController {
         String checkCode = captcha.toBase64();
 
     // 将验证码保存到Redis中并获取对应的key
-        String checkCodeKey = redisComponent.saveCode(code);
+        String checkCodeKey = authRedisComponent.saveCode(code);
 
 
     // 创建Map对象用于存储验证码key和验证码图片
@@ -77,7 +80,7 @@ public class AccountController extends ABaseController {
     // 获取用户输入的验证码
         String checkCode = registerDTO.getCheckCode();
     // 从Redis中获取存储的验证码
-        String redisCode = redisComponent.getCode(registerDTO.getCheckCodeKey());
+        String redisCode = authRedisComponent.getCode(registerDTO.getCheckCodeKey());
         boolean check = checkCode.equalsIgnoreCase(redisCode);
         try {
             if (!check) {
@@ -86,7 +89,7 @@ public class AccountController extends ABaseController {
             userLoginClient.register(registerDTO);
             return getSuccessResponseVO(null);
         }finally {
-            redisComponent.cleanCheckCode(registerDTO.getCheckCodeKey());
+            authRedisComponent.cleanCheckCode(registerDTO.getCheckCodeKey());
         }
     }
 
@@ -98,7 +101,7 @@ public class AccountController extends ABaseController {
         // 获取用户输入的验证码
         String checkCode = webLoginDTO.getCheckCode();
         // 从 redis中获取存储的验证码
-        String redisCode = redisComponent.getCode(webLoginDTO.getCheckCodeKey());
+        String redisCode = authRedisComponent.getCode(webLoginDTO.getCheckCodeKey());
         String lastLoginIp = getIpAddr();
         webLoginDTO.setLastLoginIp(lastLoginIp);
 
@@ -113,7 +116,7 @@ public class AccountController extends ABaseController {
             return getSuccessResponseVO(tokenInfo);
 
         }finally {
-            redisComponent.cleanCheckCode(webLoginDTO.getCheckCodeKey());
+            authRedisComponent.cleanCheckCode(webLoginDTO.getCheckCodeKey());
         }
     }
 
@@ -126,16 +129,18 @@ public class AccountController extends ABaseController {
             return getSuccessResponseVO(null);
 
         // 判断是否在其他浏览器中登录, 如果登录则挤掉旧账号
-        if (!redisComponent.getTokenIdByUserId(tokenUserInfo.getUserId()).equals(tokenUserInfo.getTokenId()))
+        String latestTokenId = tokenRedisComponent.getTokenIdByUserId(tokenUserInfo.getUserId());
+        if (!tokenUserInfo.getTokenId().equals(latestTokenId))
             return getSuccessResponseVO(null);
 
         if (tokenUserInfo.getExpireAt() - System.currentTimeMillis() < Constants.REDIS_EXPIRE_TIME_ONE_DAY){
-            redisComponent.saveTokenUserInfo(tokenUserInfo);
+            tokenUserInfo.setExpireAt(System.currentTimeMillis()
+                    + (long) Constants.REDIS_EXPIRE_TIME_ONE_DAY * Constants.REDIS_EXPIRE_TIME_DAY_COUNT);
+            tokenRedisComponent.updateTokenUserInfo(tokenUserInfo);
         }
 
-        redisComponent.refreshRealtimeUserStatsExpire(tokenUserInfo.getUserId());
-        //需要user模块提供接口
-        //  userStatsCacheAsyncComponent.refreshRealtimeUserStatsCache(tokenUserInfo.getUserId());
+        // 用户统计缓存归 user 服务维护，auth 只负责登录态续期和转发刷新请求。
+        userLoginClient.refreshRealtimeUserStatsCache(tokenUserInfo.getUserId());
         saveToken2Session(response, tokenUserInfo.getTokenId());
         return getSuccessResponseVO(tokenUserInfo);
     }
@@ -144,6 +149,14 @@ public class AccountController extends ABaseController {
     public ResponseVO logout(HttpServletResponse response){
         cleanCookie(response);
         return getSuccessResponseVO(null);
+    }
+
+    @RequestMapping("/getUserCountInfo")
+    @LoginInterceptor(checkLogin = true)
+    public ResponseVO getUserCountInfo() {
+        TokenUserInfoDTO tokenUserInfoDTO = getTokenUserInfo();
+        UserCountVO userCountVO = userLoginClient.getUserCountInfo(tokenUserInfoDTO.getUserId());
+        return getSuccessResponseVO(userCountVO);
     }
 
 }

@@ -3,12 +3,12 @@ package com.mybilibili.user.services;
 import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
 import com.mybilibili.base.entity.query.UserInfoQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
+import com.mybilibili.base.entity.vo.UserCountVO;
 import com.mybilibili.base.entity.vo.UserInfoVO;
 import com.mybilibili.base.enums.UserStatsRedisEnum;
 import com.mybilibili.base.entity.dto.RegisterDTO;
 import com.mybilibili.base.entity.dto.WebLoginDTO;
 import com.mybilibili.user.entity.po.UserInfo;
-import com.mybilibili.user.entity.vo.UserCountVO;
 
 import java.util.List;
 

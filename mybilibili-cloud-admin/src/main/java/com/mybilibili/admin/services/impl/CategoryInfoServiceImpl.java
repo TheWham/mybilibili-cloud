@@ -1,6 +1,7 @@
 package com.mybilibili.admin.services.impl;
 
 
+import com.mybilibili.admin.component.AdminRedisComponent;
 import com.mybilibili.admin.mappers.CategoryInfoMapper;
 import com.mybilibili.admin.services.CategoryInfoService;
 import com.mybilibili.base.constants.Constants;
@@ -10,7 +11,6 @@ import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.exception.BusinessException;
-import com.mybilibili.common.component.RedisComponent;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
@@ -31,7 +31,7 @@ public class CategoryInfoServiceImpl implements CategoryInfoService {
 	@Resource
 	private CategoryInfoMapper<CategoryInfo, CategoryInfoQuery> categoryInfoMapper;
 	@Resource
-	private RedisComponent redisComponent;
+	private AdminRedisComponent adminRedisComponent;
 
 	/**
 	 * @description 根据条件查询
@@ -210,12 +210,12 @@ public class CategoryInfoServiceImpl implements CategoryInfoService {
 
 	@Override
 	public List<CategoryInfo> loadAllCategory() {
-		List<CategoryInfo> redisList = redisComponent.getCategoryList();
+		List<CategoryInfo> redisList = adminRedisComponent.getCategoryList();
 		if (!redisList.isEmpty()) {
 			return redisList;
 		}
 		flashCache();
-		return redisComponent.getCategoryList();
+		return adminRedisComponent.getCategoryList();
 	}
 
 	private void flashCache()
@@ -224,7 +224,7 @@ public class CategoryInfoServiceImpl implements CategoryInfoService {
 		categoryInfoQuery.setOrderBy("sort asc");
 		categoryInfoQuery.setConvert2Tree(true);
 		List<CategoryInfo> categoryList = this.findListByParam(categoryInfoQuery);
-		redisComponent.saveCategoryList2Redis(categoryList);
+		adminRedisComponent.saveCategoryList2Redis(categoryList);
 	}
 
 }

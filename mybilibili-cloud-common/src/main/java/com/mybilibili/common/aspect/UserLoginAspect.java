@@ -5,7 +5,7 @@ import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
 import com.mybilibili.base.enums.ResponseCodeEnum;
 import com.mybilibili.base.exception.BusinessException;
 import com.mybilibili.common.annotation.LoginInterceptor;
-import com.mybilibili.common.component.RedisComponent;
+import com.mybilibili.common.component.TokenRedisComponent;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.JoinPoint;
@@ -21,7 +21,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 public class UserLoginAspect extends GlobalOperationAspect{
 
     @Resource
-    private RedisComponent redisComponent;
+    private TokenRedisComponent tokenRedisComponent;
 
     @Before("@annotation(com.mybilibili.common.annotation.LoginInterceptor) || @within(com.mybilibili.common.annotation.LoginInterceptor)")
     public void validLogin(JoinPoint point)
@@ -44,7 +44,7 @@ public class UserLoginAspect extends GlobalOperationAspect{
         String tokenId = request.getHeader(Constants.WEB_TOKEN_KEY);
         if (tokenId == null)
             throw new BusinessException(ResponseCodeEnum.CODE_901);
-        TokenUserInfoDTO tokenInfo = redisComponent.getTokenInfo(tokenId);
+        TokenUserInfoDTO tokenInfo = tokenRedisComponent.getTokenInfo(tokenId);
         if (tokenInfo == null)
             throw new BusinessException(ResponseCodeEnum.CODE_901);
     }

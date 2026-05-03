@@ -1,6 +1,7 @@
 package com.mybilibili.admin.controller;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.mybilibili.admin.component.AdminRedisComponent;
 import com.mybilibili.admin.services.CategoryInfoService;
 import com.mybilibili.base.entity.dto.CategoryDTO;
 import com.mybilibili.base.entity.po.CategoryInfo;
@@ -9,7 +10,6 @@ import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.entity.vo.ResponseVO;
 import com.mybilibili.base.enums.PageSize;
-import com.mybilibili.common.component.RedisComponent;
 import com.mybilibili.common.controller.ABaseController;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotNull;
@@ -39,7 +39,7 @@ public class CategoryInfoController extends ABaseController {
 	private CategoryInfoService categoryInfoService;
 
 	@Resource
-	private RedisComponent redisComponent;
+	private AdminRedisComponent adminRedisComponent;
 
 	/**
 	 * @description 根据条件分页查询
@@ -157,13 +157,13 @@ public class CategoryInfoController extends ABaseController {
 	@RequestMapping("/loadCategory")
 	public ResponseVO loadCategory()
 	{
-		List<com.mybilibili.base.entity.po.CategoryInfo> redisList = redisComponent.getCategoryList();
+		List<com.mybilibili.base.entity.po.CategoryInfo> redisList = adminRedisComponent.getCategoryList();
 		if (!redisList.isEmpty()) {
 			log.info("走的缓存");
 			return getSuccessResponseVO(redisList);
 		}
 		flashCache();
-		return getSuccessResponseVO(redisComponent.getCategoryList());
+		return getSuccessResponseVO(adminRedisComponent.getCategoryList());
 	}
 
 	@RequestMapping("/saveCategory")
@@ -198,7 +198,7 @@ public class CategoryInfoController extends ABaseController {
 		categoryInfoQuery.setOrderBy("sort asc");
 		categoryInfoQuery.setConvert2Tree(true);
 		List<com.mybilibili.base.entity.po.CategoryInfo> categoryList = this.categoryInfoService.findListByParam(categoryInfoQuery);
-		redisComponent.saveCategoryList2Redis(categoryList);
+		adminRedisComponent.saveCategoryList2Redis(categoryList);
 	}
 
 }

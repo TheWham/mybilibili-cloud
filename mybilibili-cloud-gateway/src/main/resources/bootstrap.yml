@@ -18,28 +18,72 @@ spring:
 
     gateway:
       routes:
-        - id: auth
+        # 登录、注册、验证码、自动登录等账号入口。
+        - id: mybilibili-cloud-auth
           uri: lb://mybilibili-cloud-auth
           predicates:
             - Path=/web/account/**
           filters:
             - StripPrefix=1
 
-        - id: user
+        # 用户资料、用户主页、关注、系统设置读取和用户统计。
+        - id: mybilibili-cloud-user
           uri: lb://mybilibili-cloud-user
           predicates:
-            - Path=/web/uHome/**,/web/ucenter/**,/web/user/**
+            - Path=/web/userInfo/**,/web/uhome/**,/web/uHome/**,/web/ucenter/**,/web/user/**,/web/sysSetting/**
           filters:
             - StripPrefix=1
 
-        - id: video
+        # 视频投稿、视频信息、分 P、分类读取等视频核心能力。
+        - id: mybilibili-cloud-video
           uri: lb://mybilibili-cloud-video
           predicates:
-            - Path=/web/video/**,/web/file/**,/web/category/**
+            - Path=/web/video/**,/web/category/**
           filters:
             - StripPrefix=1
 
-        - id: admin
+        # 点赞、收藏、投币、评论、弹幕、播放历史等高频互动能力。
+        - id: mybilibili-cloud-interact
+          uri: lb://mybilibili-cloud-interact
+          predicates:
+            - Path=/web/interact/**,/web/action/**,/web/userAction/**,/web/comment/**,/web/danmu/**,/web/history/**
+          filters:
+            - StripPrefix=1
+
+        # Elasticsearch 查询、热词和索引同步入口。
+        - id: mybilibili-cloud-search
+          uri: lb://mybilibili-cloud-search
+          predicates:
+            - Path=/web/search/**
+          filters:
+            - StripPrefix=1
+
+        # 文件上传、分片、转码队列和资源处理入口。
+        - id: mybilibili-cloud-media
+          uri: lb://mybilibili-cloud-media
+          predicates:
+            - Path=/web/media/**,/web/file/**
+          filters:
+            - StripPrefix=1
+
+        # 站内信、系统通知、评论通知和点赞通知。
+        - id: mybilibili-cloud-message
+          uri: lb://mybilibili-cloud-message
+          predicates:
+            - Path=/web/message/**
+          filters:
+            - StripPrefix=1
+
+        # 关键词生成、语义向量、相似视频召回和问答。
+        - id: mybilibili-cloud-ai
+          uri: lb://mybilibili-cloud-ai
+          predicates:
+            - Path=/web/ai/**
+          filters:
+            - StripPrefix=1
+
+        # 后台管理统一入口，继续走 AdminFilter 做后台侧拦截。
+        - id: mybilibili-cloud-admin
           uri: lb://mybilibili-cloud-admin
           predicates:
             - Path=/admin/**

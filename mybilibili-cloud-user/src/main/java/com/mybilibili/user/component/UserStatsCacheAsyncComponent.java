@@ -3,7 +3,6 @@ package com.mybilibili.user.component;
 import com.mybilibili.base.entity.query.UserFocusQuery;
 import com.mybilibili.base.entity.query.UserInfoQuery;
 import com.mybilibili.base.enums.UserStatsRedisEnum;
-import com.mybilibili.common.component.RedisComponent;
 import com.mybilibili.user.entity.po.UserFocus;
 import com.mybilibili.user.entity.po.UserInfo;
 import com.mybilibili.user.entity.vo.UserCountVO;
@@ -19,7 +18,7 @@ import java.util.HashMap;
 public class UserStatsCacheAsyncComponent {
 
     @Resource
-    private RedisComponent redisComponent;
+    private UserRedisComponent userRedisComponent;
     @Resource
     private UserInfoMapper<UserInfo, UserInfoQuery> userInfoMapper;
     @Resource
@@ -38,16 +37,16 @@ public class UserStatsCacheAsyncComponent {
         if (userId == null) {
             return;
         }
-        HashMap<String, Integer> cacheMap = redisComponent.getRealtimeUserStatsInfo(userId);
+        HashMap<String, Integer> cacheMap = userRedisComponent.getRealtimeUserStatsInfo(userId);
         if (cacheMap != null && !cacheMap.isEmpty()) {
-            redisComponent.refreshRealtimeUserStatsExpire(userId);
+            userRedisComponent.refreshRealtimeUserStatsExpire(userId);
             return;
         }
         HashMap<String, Integer> statsMap = buildRealtimeUserStatsSnapshot(userId);
         if (statsMap == null || statsMap.isEmpty()) {
             return;
         }
-        redisComponent.saveRealtimeUserStatsInfo(userId, statsMap);
+        userRedisComponent.saveRealtimeUserStatsInfo(userId, statsMap);
     }
 
     public HashMap<String, Integer> buildRealtimeUserStatsSnapshot(String userId) {

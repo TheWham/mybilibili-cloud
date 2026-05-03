@@ -8,8 +8,8 @@ import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.entity.vo.ResponseVO;
 import com.mybilibili.base.enums.PageSize;
-import com.mybilibili.common.component.RedisComponent;
 import com.mybilibili.common.controller.ABaseController;
+import com.mybilibili.video.component.VideoRedisComponent;
 import com.mybilibili.video.consumer.CategoryClient;
 import com.mybilibili.video.services.CategoryInfoService;
 import jakarta.annotation.Resource;
@@ -44,7 +44,7 @@ public class CategoryInfoController extends ABaseController {
 	private CategoryInfoService categoryService;
 
 	@Resource
-	private RedisComponent redisComponent;
+	private VideoRedisComponent videoRedisComponent;
 
 	/**
 	 * @description 根据条件分页查询
@@ -109,13 +109,6 @@ public class CategoryInfoController extends ABaseController {
 	public ResponseVO loadAllCategory()
 	{
 		return getSuccessResponseVO(categoryClient.loadAllCategory());
-//		List<CategoryInfo> redisList = redisComponent.getCategoryList();
-//		if (!redisList.isEmpty()) {
-//			log.info("走的缓存");
-//			return getSuccessResponseVO(redisList);
-//		}
-//		flashCache();
-//		return getSuccessResponseVO(redisComponent.getCategoryList());
 	}
 
 	@RequestMapping("/saveCategory")
@@ -150,7 +143,7 @@ public class CategoryInfoController extends ABaseController {
 		categoryInfoQuery.setOrderBy("sort asc");
 		categoryInfoQuery.setConvert2Tree(true);
 		List<CategoryInfo> categoryList = this.categoryService.findListByParam(categoryInfoQuery);
-		redisComponent.saveCategoryList2Redis(categoryList);
+		videoRedisComponent.saveCategoryList2Redis(categoryList);
 	}
 
 

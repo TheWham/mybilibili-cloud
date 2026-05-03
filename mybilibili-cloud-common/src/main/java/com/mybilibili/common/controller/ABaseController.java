@@ -5,7 +5,7 @@ import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
 import com.mybilibili.base.entity.vo.ResponseVO;
 import com.mybilibili.base.enums.ResponseCodeEnum;
 import com.mybilibili.base.exception.BusinessException;
-import com.mybilibili.common.component.RedisComponent;
+import com.mybilibili.common.component.TokenRedisComponent;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,7 +19,7 @@ public class ABaseController {
     protected static final String STATUS_ERROR = "error";
 
     @Resource
-    private RedisComponent redisComponent;
+    private TokenRedisComponent tokenRedisComponent;
 
 
 
@@ -110,7 +110,7 @@ public class ABaseController {
                         .getRequest();
 
         String tokenId = request.getHeader(Constants.WEB_TOKEN_KEY);
-        TokenUserInfoDTO tokenInfo = redisComponent.getTokenInfo(tokenId);
+        TokenUserInfoDTO tokenInfo = tokenRedisComponent.getTokenInfo(tokenId);
         return tokenInfo;
     }
 
@@ -130,7 +130,7 @@ public class ABaseController {
                 String tokenId = cookie.getValue();
                 cookie.setPath("/");
                 cookie.setMaxAge(0);
-                redisComponent.cleanWebToken(tokenId);
+                tokenRedisComponent.cleanWebToken(tokenId);
                 response.addCookie(cookie);
                 break;
             }

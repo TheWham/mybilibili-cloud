@@ -7,7 +7,7 @@ import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.enums.UserStatsRedisEnum;
 import com.mybilibili.base.exception.BusinessException;
-import com.mybilibili.common.component.RedisComponent;
+import com.mybilibili.user.component.UserRedisComponent;
 import com.mybilibili.user.entity.po.UserFocus;
 import com.mybilibili.user.mappers.UserFocusMapper;
 import com.mybilibili.user.services.UserFocusService;
@@ -30,7 +30,7 @@ public class UserFocusServiceImpl implements UserFocusService {
 	@Resource
 	private UserFocusMapper<UserFocus, UserFocusQuery> userFocusMapper;
 	@Resource
-	private RedisComponent redisComponent;
+	private UserRedisComponent userRedisComponent;
 
 	/**
 	 * 根据条件查询
@@ -131,8 +131,8 @@ public class UserFocusServiceImpl implements UserFocusService {
 			//插入失败表示已经关注
 			throw new BusinessException("不能重复关注");
 		}
-		redisComponent.incrementUserStats(userId, UserStatsRedisEnum.USER_FOCUS.getField(), Constants.ONE);
-		redisComponent.incrementUserStats(focusUserId, UserStatsRedisEnum.USER_FANS.getField(), Constants.ONE);
+		userRedisComponent.incrementUserStats(userId, UserStatsRedisEnum.USER_FOCUS.getField(), Constants.ONE);
+		userRedisComponent.incrementUserStats(focusUserId, UserStatsRedisEnum.USER_FANS.getField(), Constants.ONE);
 	}
 
 	@Override
@@ -142,8 +142,8 @@ public class UserFocusServiceImpl implements UserFocusService {
 		Integer count = userFocusMapper.deleteByUserIdAndUserFocusId(userId, focusUserId);
 		if (count == 0)
 			throw new BusinessException("取关失败");
-		redisComponent.incrementUserStats(userId, UserStatsRedisEnum.USER_FOCUS.getField(), -Constants.ONE);
-		redisComponent.incrementUserStats(focusUserId, UserStatsRedisEnum.USER_FANS.getField(), -Constants.ONE);
+		userRedisComponent.incrementUserStats(userId, UserStatsRedisEnum.USER_FOCUS.getField(), -Constants.ONE);
+		userRedisComponent.incrementUserStats(focusUserId, UserStatsRedisEnum.USER_FANS.getField(), -Constants.ONE);
 	}
 
 	@Override
