@@ -5,7 +5,7 @@ import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.RegisterDTO;
 import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
 import com.mybilibili.base.entity.dto.WebLoginDTO;
-import com.mybilibili.base.entity.po.UserStats;
+import com.mybilibili.user.entity.po.UserStats;
 import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.query.UserFocusQuery;
 import com.mybilibili.base.entity.query.UserInfoQuery;

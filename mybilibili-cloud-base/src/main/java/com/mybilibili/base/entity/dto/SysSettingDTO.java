@@ -1,10 +1,12 @@
 package com.mybilibili.base.entity.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.mybilibili.base.entity.po.SysSetting;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.Date;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SysSettingDTO implements Serializable {
@@ -24,6 +26,11 @@ public class SysSettingDTO implements Serializable {
     private Integer videoCount;
     private Integer commentCount;
     private Integer danmuCount;
+    private Long id;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date updateTime;
+    private String updateBy;
 
     public static SysSettingDTO createDefault() {
         SysSettingDTO sysSettingDTO = new SysSettingDTO();
@@ -35,47 +42,6 @@ public class SysSettingDTO implements Serializable {
         sysSettingDTO.setCommentCount(100);
         sysSettingDTO.setDanmuCount(100);
         return sysSettingDTO;
-    }
-
-    public static SysSettingDTO fromSysSetting(SysSetting sysSetting) {
-        SysSettingDTO sysSettingDTO = createDefault();
-        if (sysSetting == null) {
-            return sysSettingDTO;
-        }
-        if (sysSetting.getRegisterCoinCount() != null) {
-            sysSettingDTO.setRegisterCoinCount(sysSetting.getRegisterCoinCount());
-        }
-        if (sysSetting.getPostVideoCoinCount() != null) {
-            sysSettingDTO.setPostVideoCoinCount(sysSetting.getPostVideoCoinCount());
-        }
-        if (sysSetting.getVideoSize() != null) {
-            sysSettingDTO.setVideoSize(sysSetting.getVideoSize());
-        }
-        if (sysSetting.getVideoPCount() != null) {
-            sysSettingDTO.setVideoPCount(sysSetting.getVideoPCount());
-        }
-        if (sysSetting.getVideoCount() != null) {
-            sysSettingDTO.setVideoCount(sysSetting.getVideoCount());
-        }
-        if (sysSetting.getCommentCount() != null) {
-            sysSettingDTO.setCommentCount(sysSetting.getCommentCount());
-        }
-        if (sysSetting.getDanmuCount() != null) {
-            sysSettingDTO.setDanmuCount(sysSetting.getDanmuCount());
-        }
-        return sysSettingDTO;
-    }
-
-    public SysSetting toSysSetting() {
-        SysSetting sysSetting = new SysSetting();
-        sysSetting.setRegisterCoinCount(this.registerCoinCount);
-        sysSetting.setPostVideoCoinCount(this.postVideoCoinCount);
-        sysSetting.setVideoSize(this.videoSize);
-        sysSetting.setVideoPCount(this.videoPCount);
-        sysSetting.setVideoCount(this.videoCount);
-        sysSetting.setCommentCount(this.commentCount);
-        sysSetting.setDanmuCount(this.danmuCount);
-        return sysSetting;
     }
 
     public Integer getRegisterCoinCount() {
@@ -132,5 +98,29 @@ public class SysSettingDTO implements Serializable {
 
     public void setDanmuCount(Integer danmuCount) {
         this.danmuCount = danmuCount;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Date getUpdateTime() {
+        return updateTime;
+    }
+
+    public void setUpdateTime(Date updateTime) {
+        this.updateTime = updateTime;
+    }
+
+    public String getUpdateBy() {
+        return updateBy;
+    }
+
+    public void setUpdateBy(String updateBy) {
+        this.updateBy = updateBy;
     }
 }

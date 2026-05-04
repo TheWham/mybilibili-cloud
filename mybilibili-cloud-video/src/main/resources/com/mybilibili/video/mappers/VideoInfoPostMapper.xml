@@ -1,0 +1,570 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTO Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mybilibili.video.mappers.VideoInfoPostMapper">
+	<!--实体映射 -->
+	<resultMap id="base_result_map" type="com.mybilibili.video.entity.po.VideoInfoPost">
+		<!-- 视频ID-->
+		<id column="video_id" property="videoId"/>
+		<!-- 视频封面-->
+		<result column="video_cover" property="videoCover"/>
+		<!-- 视频名称-->
+		<result column="video_name" property="videoName"/>
+		<!-- 用户id-->
+		<result column="user_id" property="userId"/>
+		<!-- 创建时间-->
+		<result column="create_time" property="createTime"/>
+		<!-- 最后更新时间-->
+		<result column="last_update_time" property="lastUpdateTime"/>
+		<!-- 父级分类id-->
+		<result column="p_category_id" property="pCategoryId"/>
+		<!-- 分类id-->
+		<result column="category_id" property="categoryId"/>
+		<!-- 0:转码中, 1:转码失败, 2: 待审核, 3:审核成功, 4:审核失败-->
+		<result column="status" property="status"/>
+		<!-- 0:自制作, 1:转载-->
+		<result column="post_type" property="postType"/>
+		<!-- 原资源说明-->
+		<result column="origin_info" property="originInfo"/>
+		<!-- 标签-->
+		<result column="tags" property="tags"/>
+		<!-- 简介-->
+		<result column="introduction" property="introduction"/>
+		<!-- 互动设置-->
+		<result column="interaction" property="interaction"/>
+		<!-- 持续时间(秒)-->
+		<result column="duration" property="duration"/>
+		<!-- 昵称 -->
+		<result column="nick_name" property="nickName"/>
+	</resultMap>
+
+	<!--通用查询结果列 -->
+	<sql id="base_column_list">
+		v.video_id,v.video_cover,v.video_name,v.user_id,v.create_time,v.last_update_time,v.p_category_id,v.category_id,v.status,v.post_type,v.origin_info,v.tags,v.introduction,v.interaction,v.duration
+	</sql>
+
+	<!--基础查询条件 -->
+	<sql id="base_query_condition">
+		<if test="query.videoId != null and query.videoId != ''" >
+			and v.video_id = #{query.videoId}
+		</if>
+		<if test="query.videoCover != null and query.videoCover != ''" >
+			and v.video_cover = #{query.videoCover}
+		</if>
+		<if test="query.videoName != null and query.videoName != ''" >
+			and v.video_name = #{query.videoName}
+		</if>
+		<if test="query.userId != null and query.userId != ''" >
+			and v.user_id = #{query.userId}
+		</if>
+		<if test="query.createTime != null and query.createTime != ''" >
+			<![CDATA[ and v.create_time=str_to_date(#{query.createTime}, '%Y-%m-%d') ]]>
+		</if>
+		<if test="query.lastUpdateTime != null and query.lastUpdateTime != ''" >
+			<![CDATA[ and v.last_update_time=str_to_date(#{query.lastUpdateTime}, '%Y-%m-%d') ]]>
+		</if>
+		<if test="query.pCategoryId != null" >
+			and v.p_category_id = #{query.pCategoryId}
+		</if>
+		<if test="query.categoryId != null" >
+			and v.category_id = #{query.categoryId}
+		</if>
+		<if test="query.status != null" >
+			and v.status = #{query.status}
+		</if>
+		<if test="query.postType != null" >
+			and v.post_type = #{query.postType}
+		</if>
+		<if test="query.originInfo != null and query.originInfo != ''" >
+			and v.origin_info = #{query.originInfo}
+		</if>
+		<if test="query.tags != null and query.tags != ''" >
+			and v.tags = #{query.tags}
+		</if>
+		<if test="query.introduction != null and query.introduction != ''" >
+			and v.introduction = #{query.introduction}
+		</if>
+		<if test="query.interaction != null and query.interaction != ''" >
+			and v.interaction = #{query.interaction}
+		</if>
+		<if test="query.duration != null" >
+			and v.duration = #{query.duration}
+		</if>
+		<if test="query.recommendType != null" >
+			and c.recommend_type = #{query.recommendType}
+		</if>
+	</sql>
+
+	<!--通用条件列 -->
+	<sql id="query_condition">
+		<where>
+			<include refid="base_query_condition" />
+			<include refid="base_query_condition_extend" />
+		</where>
+	</sql>
+
+	<!--拓展查询条件 -->
+	<sql id="base_query_condition_extend">
+		<if test="query.videoIdFuzzy != null and query.videoIdFuzzy != ''" >
+			and v.video_id like concat('%', #{query.videoIdFuzzy}, '%')
+		</if>
+		<if test="query.videoCoverFuzzy != null and query.videoCoverFuzzy != ''" >
+			and v.video_cover like concat('%', #{query.videoCoverFuzzy}, '%')
+		</if>
+		<if test="query.videoNameFuzzy != null and query.videoNameFuzzy != ''" >
+			and v.video_name like concat('%', #{query.videoNameFuzzy}, '%')
+		</if>
+		<if test="query.userIdFuzzy != null and query.userIdFuzzy != ''" >
+			and v.user_id like concat('%', #{query.userIdFuzzy}, '%')
+		</if>
+		<if test="query.createTimeStart != null and query.createTimeStart != ''" >
+			<![CDATA[ and v.create_time >= str_to_date(#{query.createTimeStart}, '%Y-%m-%d')]]>
+		</if>
+		<if test="query.createTimeEnd != null and query.createTimeEnd != ''" >
+			<![CDATA[ and v.create_time <= DATE_SUB(str_to_date(#{query.createTimeEnd}, '%Y-%m-%d'), INTERVAL 1 DAY)]]>
+		</if>
+		<if test="query.lastUpdateTimeStart != null and query.lastUpdateTimeStart != ''" >
+			<![CDATA[ and v.last_update_time >= str_to_date(#{query.lastUpdateTimeStart}, '%Y-%m-%d')]]>
+		</if>
+		<if test="query.lastUpdateTimeEnd != null and query.lastUpdateTimeEnd != ''" >
+			<![CDATA[ and v.last_update_time <= DATE_SUB(str_to_date(#{query.lastUpdateTimeEnd}, '%Y-%m-%d'), INTERVAL 1 DAY)]]>
+		</if>
+		<if test="query.originInfoFuzzy != null and query.originInfoFuzzy != ''" >
+			and v.origin_info like concat('%', #{query.originInfoFuzzy}, '%')
+		</if>
+		<if test="query.tagsFuzzy != null and query.tagsFuzzy != ''" >
+			and v.tags like concat('%', #{query.tagsFuzzy}, '%')
+		</if>
+		<if test="query.introductionFuzzy != null and query.introductionFuzzy != ''" >
+			and v.introduction like concat('%', #{query.introductionFuzzy}, '%')
+		</if>
+		<if test="query.interactionFuzzy != null and query.interactionFuzzy != ''" >
+			and v.interaction like concat('%', #{query.interactionFuzzy}, '%')
+		</if>
+		<if test="query.excludeStatusArray != null and query.excludeStatusArray.length > 0">
+			and v.status not in
+			<foreach collection="query.excludeStatusArray" item="item" open="(" separator="," close=")">
+				#{item}
+			</foreach>
+		</if>
+	</sql>
+
+	<!--通用查询列表 -->
+	<select id="selectList" resultMap="base_result_map">
+		SELECT
+		<include refid="base_column_list"/>
+		<if test="query.queryCountInfo">
+		 ,c.play_count, c.like_count, c.coin_count, c.danmu_count, c.comment_count, c.collect_count,c.recommend_type
+		</if>
+		<if test="query.queryUserInfo">
+			,u.nick_name,u.avatar
+		</if>
+		FROM video_info_post v
+		<if test="query.queryCountInfo or query.recommendType != null">
+		left join video_info c on c.video_id = v.video_id
+		</if>
+		<if test="query.queryUserInfo">
+			left join user_info u on u.user_id = v.user_id
+		</if>
+		<include refid="query_condition"/>
+		<if test="query.orderBy!=null">
+			order by ${query.orderBy}
+		</if>
+		<if test="query.simplePage!=null">
+			limit #{query.simplePage.start}, #{query.simplePage.end}
+		</if>
+	</select>
+
+	<!--查询数量 -->
+	<select id="selectCount" resultType="java.lang.Integer">
+		SELECT count(1) FROM video_info_post v
+		<if test="query.recommendType != null">
+			left join video_info c on c.video_id = v.video_id
+		</if>
+		<include refid="query_condition"/>
+	</select>
+
+	<!--插入 -->
+	<insert id="insert" parameterType="com.mybilibili.video.entity.po.VideoInfoPost">
+		INSERT INTO video_info_post
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="bean.videoId != null">
+				video_id,
+			</if>
+			<if test="bean.videoCover != null">
+				video_cover,
+			</if>
+			<if test="bean.videoName != null">
+				video_name,
+			</if>
+			<if test="bean.userId != null">
+				user_id,
+			</if>
+			<if test="bean.createTime != null">
+				create_time,
+			</if>
+			<if test="bean.lastUpdateTime != null">
+				last_update_time,
+			</if>
+			<if test="bean.pCategoryId != null">
+				p_category_id,
+			</if>
+			<if test="bean.categoryId != null">
+				category_id,
+			</if>
+			<if test="bean.status != null">
+				status,
+			</if>
+			<if test="bean.postType != null">
+				post_type,
+			</if>
+			<if test="bean.originInfo != null">
+				origin_info,
+			</if>
+			<if test="bean.tags != null">
+				tags,
+			</if>
+			<if test="bean.introduction != null">
+				introduction,
+			</if>
+			<if test="bean.interaction != null">
+				interaction,
+			</if>
+			<if test="bean.duration != null">
+				duration,
+			</if>
+		</trim>
+		<trim prefix="values (" suffix=")" suffixOverrides=",">
+			<if test="bean.videoId != null">
+				#{bean.videoId},
+			</if>
+			<if test="bean.videoCover != null">
+				#{bean.videoCover},
+			</if>
+			<if test="bean.videoName != null">
+				#{bean.videoName},
+			</if>
+			<if test="bean.userId != null">
+				#{bean.userId},
+			</if>
+			<if test="bean.createTime != null">
+				#{bean.createTime},
+			</if>
+			<if test="bean.lastUpdateTime != null">
+				#{bean.lastUpdateTime},
+			</if>
+			<if test="bean.pCategoryId != null">
+				#{bean.pCategoryId},
+			</if>
+			<if test="bean.categoryId != null">
+				#{bean.categoryId},
+			</if>
+			<if test="bean.status != null">
+				#{bean.status},
+			</if>
+			<if test="bean.postType != null">
+				#{bean.postType},
+			</if>
+			<if test="bean.originInfo != null">
+				#{bean.originInfo},
+			</if>
+			<if test="bean.tags != null">
+				#{bean.tags},
+			</if>
+			<if test="bean.introduction != null">
+				#{bean.introduction},
+			</if>
+			<if test="bean.interaction != null">
+				#{bean.interaction},
+			</if>
+			<if test="bean.duration != null">
+				#{bean.duration},
+			</if>
+		</trim>
+
+	</insert>
+
+	<!--insertOrUpdate 过滤掉了唯一索引字段-->
+	<insert id="insertOrUpdate" parameterType="com.mybilibili.video.entity.po.VideoInfoPost">
+		INSERT INTO video_info_post
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="bean.videoId != null">
+				video_id,
+			</if>
+			<if test="bean.videoCover != null">
+				video_cover,
+			</if>
+			<if test="bean.videoName != null">
+				video_name,
+			</if>
+			<if test="bean.userId != null">
+				user_id,
+			</if>
+			<if test="bean.createTime != null">
+				create_time,
+			</if>
+			<if test="bean.lastUpdateTime != null">
+				last_update_time,
+			</if>
+			<if test="bean.pCategoryId != null">
+				p_category_id,
+			</if>
+			<if test="bean.categoryId != null">
+				category_id,
+			</if>
+			<if test="bean.status != null">
+				status,
+			</if>
+			<if test="bean.postType != null">
+				post_type,
+			</if>
+			<if test="bean.originInfo != null">
+				origin_info,
+			</if>
+			<if test="bean.tags != null">
+				tags,
+			</if>
+			<if test="bean.introduction != null">
+				introduction,
+			</if>
+			<if test="bean.interaction != null">
+				interaction,
+			</if>
+			<if test="bean.duration != null">
+				duration,
+			</if>
+		</trim>
+		<trim prefix="values (" suffix=")" suffixOverrides=",">
+			<if test="bean.videoId != null">
+				#{bean.videoId},
+			</if>
+			<if test="bean.videoCover != null">
+				#{bean.videoCover},
+			</if>
+			<if test="bean.videoName != null">
+				#{bean.videoName},
+			</if>
+			<if test="bean.userId != null">
+				#{bean.userId},
+			</if>
+			<if test="bean.createTime != null">
+				#{bean.createTime},
+			</if>
+			<if test="bean.lastUpdateTime != null">
+				#{bean.lastUpdateTime},
+			</if>
+			<if test="bean.pCategoryId != null">
+				#{bean.pCategoryId},
+			</if>
+			<if test="bean.categoryId != null">
+				#{bean.categoryId},
+			</if>
+			<if test="bean.status != null">
+				#{bean.status},
+			</if>
+			<if test="bean.postType != null">
+				#{bean.postType},
+			</if>
+			<if test="bean.originInfo != null">
+				#{bean.originInfo},
+			</if>
+			<if test="bean.tags != null">
+				#{bean.tags},
+			</if>
+			<if test="bean.introduction != null">
+				#{bean.introduction},
+			</if>
+			<if test="bean.interaction != null">
+				#{bean.interaction},
+			</if>
+			<if test="bean.duration != null">
+				#{bean.duration},
+			</if>
+		</trim>
+		on DUPLICATE key update
+		<trim prefix="" suffix="" suffixOverrides=",">
+			<if test="bean.videoCover != null">
+				video_cover = VALUES(video_cover),
+			</if>
+			<if test="bean.videoName != null">
+				video_name = VALUES(video_name),
+			</if>
+			<if test="bean.userId != null">
+				user_id = VALUES(user_id),
+			</if>
+			<if test="bean.createTime != null">
+				create_time = VALUES(create_time),
+			</if>
+			<if test="bean.lastUpdateTime != null">
+				last_update_time = VALUES(last_update_time),
+			</if>
+			<if test="bean.pCategoryId != null">
+				p_category_id = VALUES(p_category_id),
+			</if>
+			<if test="bean.categoryId != null">
+				category_id = VALUES(category_id),
+			</if>
+			<if test="bean.status != null">
+				status = VALUES(status),
+			</if>
+			<if test="bean.postType != null">
+				post_type = VALUES(post_type),
+			</if>
+			<if test="bean.originInfo != null">
+				origin_info = VALUES(origin_info),
+			</if>
+			<if test="bean.tags != null">
+				tags = VALUES(tags),
+			</if>
+			<if test="bean.introduction != null">
+				introduction = VALUES(introduction),
+			</if>
+			<if test="bean.interaction != null">
+				interaction = VALUES(interaction),
+			</if>
+			<if test="bean.duration != null">
+				duration = VALUES(duration),
+			</if>
+		</trim>
+	</insert>
+
+	<!--批量添加 -->
+	<insert id="insertBatch" parameterType="com.mybilibili.video.entity.po.VideoInfoPost"  useGeneratedKeys="true" keyProperty="videoId">
+		INSERT INTO video_info_post(video_id,video_cover,video_name,user_id,create_time,last_update_time,p_category_id,category_id,status,post_type,origin_info,tags,introduction,interaction,duration) values
+		<foreach collection="list" item="item" separator=",">
+			(
+			#{item.videoId},#{item.videoCover},#{item.videoName},#{item.userId},#{item.createTime},#{item.lastUpdateTime},#{item.pCategoryId},#{item.categoryId},#{item.status},#{item.postType},#{item.originInfo},#{item.tags},#{item.introduction},#{item.interaction},#{item.duration}
+			)
+		</foreach>
+	</insert>
+
+	<!--批量新增修改 (没有过滤掉唯一索引字段)-->
+	<insert id="insertOrUpdateBatch" parameterType="com.mybilibili.video.entity.po.VideoInfoPost">
+		INSERT INTO video_info_post(video_id,video_cover,video_name,user_id,create_time,last_update_time,p_category_id,category_id,status,post_type,origin_info,tags,introduction,interaction,duration) values
+		<foreach collection="list" item="item" separator=",">
+			(
+			#{item.videoId},#{item.videoCover},#{item.videoName},#{item.userId},#{item.createTime},#{item.lastUpdateTime},#{item.pCategoryId},#{item.categoryId},#{item.status},#{item.postType},#{item.originInfo},#{item.tags},#{item.introduction},#{item.interaction},#{item.duration}
+			)
+		</foreach>
+		on DUPLICATE key update
+		video_cover = VALUES(video_cover),video_name = VALUES(video_name),user_id = VALUES(user_id),create_time = VALUES(create_time),last_update_time = VALUES(last_update_time),p_category_id = VALUES(p_category_id),category_id = VALUES(category_id),status = VALUES(status),post_type = VALUES(post_type),origin_info = VALUES(origin_info),tags = VALUES(tags),introduction = VALUES(introduction),interaction = VALUES(interaction),duration = VALUES(duration)
+	</insert>
+
+	<!--根据VideoId查询 -->
+	<select id="selectByVideoId" resultMap="base_result_map">
+		select <include refid="base_column_list"/>
+		from video_info_post v where v.video_id=#{videoId}
+	</select>
+
+	<!--根据VideoId删除 -->
+	<delete id="deleteByVideoId">
+		delete from video_info_post where video_id=#{videoId}
+	</delete>
+
+
+	<!--根据VideoId更新 -->
+	<update id="updateByVideoId" parameterType="com.mybilibili.video.entity.po.VideoInfoPost">
+		update video_info_post
+		<set>
+			<if test="bean.videoId != null">
+				video_id = #{bean.videoId},
+			</if>
+			<if test="bean.videoCover != null">
+				video_cover = #{bean.videoCover},
+			</if>
+			<if test="bean.videoName != null">
+				video_name = #{bean.videoName},
+			</if>
+			<if test="bean.userId != null">
+				user_id = #{bean.userId},
+			</if>
+			<if test="bean.createTime != null">
+				create_time = #{bean.createTime},
+			</if>
+			<if test="bean.lastUpdateTime != null">
+				last_update_time = #{bean.lastUpdateTime},
+			</if>
+			<if test="bean.pCategoryId != null">
+				p_category_id = #{bean.pCategoryId},
+			</if>
+			<if test="bean.categoryId != null">
+				category_id = #{bean.categoryId},
+			</if>
+			<if test="bean.status != null">
+				status = #{bean.status},
+			</if>
+			<if test="bean.postType != null">
+				post_type = #{bean.postType},
+			</if>
+			<if test="bean.originInfo != null">
+				origin_info = #{bean.originInfo},
+			</if>
+			<if test="bean.tags != null">
+				tags = #{bean.tags},
+			</if>
+			<if test="bean.introduction != null">
+				introduction = #{bean.introduction},
+			</if>
+			<if test="bean.interaction != null">
+				interaction = #{bean.interaction},
+			</if>
+			<if test="bean.duration != null">
+				duration = #{bean.duration},
+			</if>
+		</set>
+		where video_id=#{videoId}
+	</update>
+
+	<update id="updateByCondition">
+		update video_info_post v
+		<set>
+			<if test="bean.videoId != null">
+				v.video_id = #{bean.videoId},
+			</if>
+			<if test="bean.videoCover != null">
+				v.video_cover = #{bean.videoCover},
+			</if>
+			<if test="bean.videoName != null">
+				v.video_name = #{bean.videoName},
+			</if>
+			<if test="bean.userId != null">
+				v.user_id = #{bean.userId},
+			</if>
+			<if test="bean.createTime != null">
+				v.create_time = #{bean.createTime},
+			</if>
+			<if test="bean.lastUpdateTime != null">
+				v.last_update_time = #{bean.lastUpdateTime},
+			</if>
+			<if test="bean.pCategoryId != null">
+				v.p_category_id = #{bean.pCategoryId},
+			</if>
+			<if test="bean.categoryId != null">
+				v.category_id = #{bean.categoryId},
+			</if>
+			<if test="bean.status != null">
+				v.status = #{bean.status},
+			</if>
+			<if test="bean.postType != null">
+				v.post_type = #{bean.postType},
+			</if>
+			<if test="bean.originInfo != null">
+				v.origin_info = #{bean.originInfo},
+			</if>
+			<if test="bean.tags != null">
+				v.tags = #{bean.tags},
+			</if>
+			<if test="bean.introduction != null">
+				v.introduction = #{bean.introduction},
+			</if>
+			<if test="bean.interaction != null">
+				v.interaction = #{bean.interaction},
+			</if>
+			<if test="bean.duration != null">
+				v.duration = #{bean.duration},
+			</if>
+		</set>
+		<include refid="query_condition"/>
+	</update>
+
+</mapper>

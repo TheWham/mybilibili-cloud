@@ -1,6 +1,6 @@
 package com.mybilibili.message.component;
 
-import com.mybilibili.base.entity.po.UserMessage;
+import com.mybilibili.message.entity.po.UserMessage;
 import com.mybilibili.common.redis.RedisUtils;
 import com.mybilibili.message.constants.MessageRedisKeys;
 import jakarta.annotation.Resource;

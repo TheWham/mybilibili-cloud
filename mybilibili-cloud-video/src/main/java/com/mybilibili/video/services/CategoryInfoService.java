@@ -2,7 +2,7 @@ package com.mybilibili.video.services;
 
 
 
-import com.mybilibili.base.entity.po.CategoryInfo;
+import com.mybilibili.video.entity.po.CategoryInfo;
 import com.mybilibili.base.entity.query.CategoryInfoQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 

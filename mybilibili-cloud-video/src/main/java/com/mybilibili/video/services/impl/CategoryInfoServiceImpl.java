@@ -1,7 +1,7 @@
 package com.mybilibili.video.services.impl;
 
 import com.mybilibili.base.constants.Constants;
-import com.mybilibili.base.entity.po.CategoryInfo;
+import com.mybilibili.video.entity.po.CategoryInfo;
 import com.mybilibili.base.entity.query.CategoryInfoQuery;
 import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.vo.PaginationResultVO;

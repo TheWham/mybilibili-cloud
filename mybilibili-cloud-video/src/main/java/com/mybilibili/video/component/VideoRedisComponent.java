@@ -2,10 +2,17 @@ package com.mybilibili.video.component;
 
 import com.alibaba.fastjson2.JSON;
 import com.mybilibili.base.constants.Constants;
+import com.mybilibili.base.entity.dto.AiSubtitleIndexTaskDTO;
+import com.mybilibili.base.entity.dto.SysSettingDTO;
+import com.mybilibili.base.entity.dto.UploadingFileDTO;
 import com.mybilibili.base.entity.dto.VideoHistoryDeleteDTO;
-import com.mybilibili.base.entity.po.CategoryInfo;
+import com.mybilibili.common.convert.SysSettingConverter;
+import com.mybilibili.common.entity.po.SysSetting;
+import com.mybilibili.video.entity.po.CategoryInfo;
 import com.mybilibili.common.redis.RedisUtils;
+import com.mybilibili.common.services.SysSettingService;
 import com.mybilibili.video.constants.VideoRedisKeys;
+import com.mybilibili.video.entity.po.VideoInfoFilePost;
 import jakarta.annotation.Resource;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
@@ -27,8 +34,12 @@ import java.util.Set;
 @Component
 public class VideoRedisComponent {
 
+    private static final long SYS_SETTING_ID = 1L;
+
     @Resource
     private RedisUtils redisUtils;
+    @Resource
+    private SysSettingService sysSettingService;
 
     public void saveCategoryList2Redis(List<CategoryInfo> categoryList) {
         redisUtils.set(VideoRedisKeys.CATEGORY_KEY, categoryList);
@@ -71,6 +82,7 @@ public class VideoRedisComponent {
                 (long) Constants.REDIS_EXPIRE_TIME_ONE_DAY * Constants.LENGTH_90);
 
         List<String> historyList = redisUtils.getZSetList(historyKey, -1);
+        //显示用户最近1000条的历史记录
         if (historyList.size() > Constants.LENGTH_1000) {
             List<String> expiredVideoIds = new ArrayList<>(historyList.subList(Constants.LENGTH_1000, historyList.size()));
             redisUtils.zremove(historyKey, expiredVideoIds.toArray());
@@ -83,6 +95,7 @@ public class VideoRedisComponent {
             }
         }
 
+        //每个用户历史记录显示最近3个月的
         redisUtils.expire(historyKey, (long) Constants.REDIS_EXPIRE_TIME_ONE_DAY * Constants.LENGTH_90);
         redisUtils.zaddUserId(VideoRedisKeys.DIRTY_HISTORY_USER, userId);
     }
@@ -103,6 +116,86 @@ public class VideoRedisComponent {
     public void addVideoPlayCountDelta(String videoId) {
         redisUtils.hincr(VideoRedisKeys.VIDEO_PLAY_COUNT_DELTA, videoId, 1);
         redisUtils.expire(VideoRedisKeys.VIDEO_PLAY_COUNT_DELTA, Constants.REDIS_EXPIRE_TIME_TWO_DAY);
+    }
+
+    public Map<String, Integer> getVideoActionCountDelta(String videoId) {
+        Map<Object, Object> valueMap = redisUtils.hmget(VideoRedisKeys.VIDEO_ACTION_COUNT_DELTA + videoId);
+        if (valueMap == null || valueMap.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, Integer> resultMap = new HashMap<>(valueMap.size());
+        for (Map.Entry<Object, Object> entry : valueMap.entrySet()) {
+            if (entry.getKey() != null && entry.getValue() != null) {
+                resultMap.put(entry.getKey().toString(), Integer.parseInt(entry.getValue().toString()));
+            }
+        }
+        return resultMap;
+    }
+
+    public SysSettingDTO getSysSetting() {
+        Object sysSetting = redisUtils.get(VideoRedisKeys.SYS_SETTING_KEY);
+        if (sysSetting instanceof SysSettingDTO dto) {
+            return dto;
+        }
+        if (sysSetting != null) {
+            return JSON.parseObject(JSON.toJSONString(sysSetting), SysSettingDTO.class);
+        }
+
+        SysSetting sysSettingDb = sysSettingService.getSysSettingById(SYS_SETTING_ID);
+        if (sysSettingDb == null) {
+            SysSetting initSetting = SysSettingConverter.toPO(SysSettingDTO.createDefault());
+            initSetting.setId(SYS_SETTING_ID);
+            sysSettingService.add(initSetting);
+            sysSettingDb = sysSettingService.getSysSettingById(SYS_SETTING_ID);
+        }
+        SysSettingDTO sysSettingDTO = SysSettingConverter.toDTO(sysSettingDb);
+        redisUtils.set(VideoRedisKeys.SYS_SETTING_KEY, sysSettingDTO);
+        return sysSettingDTO;
+    }
+
+    public void addVideoAuditReward(String userId, String videoId, Integer rewardCoinCount) {
+        Map<String, Object> rewardMap = new HashMap<>(3);
+        rewardMap.put("userId", userId);
+        rewardMap.put("videoId", videoId);
+        rewardMap.put("rewardCoinCount", rewardCoinCount);
+        redisUtils.lpush(VideoRedisKeys.VIDEO_AUDIT_REWARD_QUEUE, rewardMap, 0L);
+    }
+
+    public void addFileList2DelQueue(String videoId, List<String> filePathList) {
+        redisUtils.lpushAll(VideoRedisKeys.DEL_FILE_QUEUE + videoId,
+                filePathList,
+                (long) Constants.REDIS_EXPIRE_TIME_ONE_DAY * Constants.REDIS_EXPIRE_TIME_DAY_COUNT);
+    }
+
+    public List<String> getDelFilePathsQueue(String videoId) {
+        return redisUtils.getQueueList(VideoRedisKeys.DEL_FILE_QUEUE + videoId);
+    }
+
+    public void cleanDelFilePaths(String videoId) {
+        redisUtils.delete(VideoRedisKeys.DEL_FILE_QUEUE + videoId);
+    }
+
+    public void addFileList2TransferQueue(List<VideoInfoFilePost> addList) {
+        redisUtils.lpushAll(VideoRedisKeys.TRANSFER_FILE_QUEUE, addList, 0L);
+    }
+
+    public UploadingFileDTO getUploadFileInfo(String key) {
+        return (UploadingFileDTO) redisUtils.get(key);
+    }
+
+    public void delUploadVideoInfo(String userId, String uploadId) {
+        redisUtils.delete(VideoRedisKeys.UPLOADING_FILE_INFO_KEY + userId + uploadId);
+    }
+
+    public void addAiSubtitleIndexTask(AiSubtitleIndexTaskDTO task) {
+        redisUtils.lpush(VideoRedisKeys.AI_SUBTITLE_INDEX_QUEUE, task, 0L);
+    }
+
+    public Long incrementUserStats(String userId, String field, long count) {
+        String key = VideoRedisKeys.USER_STATS_KEY + userId;
+        Long value = redisUtils.hincr(key, field, count);
+        redisUtils.expire(key, (long) Constants.REDIS_EXPIRE_TIME_ONE_DAY * Constants.REDIS_USER_STATS_CACHE_TTL_DAYS);
+        return value;
     }
 
     public Map<String, Integer> getAllVideoPlayCountDelta() {

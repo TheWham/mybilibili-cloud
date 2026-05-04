@@ -2,7 +2,7 @@ package com.mybilibili.video.consumer;
 
 
 import com.mybilibili.base.constants.Constants;
-import com.mybilibili.base.entity.po.CategoryInfo;
+import com.mybilibili.video.entity.po.CategoryInfo;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.RequestMapping;
 

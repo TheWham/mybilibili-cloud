@@ -4,7 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.mybilibili.admin.component.AdminRedisComponent;
 import com.mybilibili.admin.services.CategoryInfoService;
 import com.mybilibili.base.entity.dto.CategoryDTO;
-import com.mybilibili.base.entity.po.CategoryInfo;
+import com.mybilibili.admin.entity.po.CategoryInfo;
 import com.mybilibili.base.entity.query.CategoryInfoQuery;
 import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
@@ -157,7 +157,7 @@ public class CategoryInfoController extends ABaseController {
 	@RequestMapping("/loadCategory")
 	public ResponseVO loadCategory()
 	{
-		List<com.mybilibili.base.entity.po.CategoryInfo> redisList = adminRedisComponent.getCategoryList();
+		List<com.mybilibili.admin.entity.po.CategoryInfo> redisList = adminRedisComponent.getCategoryList();
 		if (!redisList.isEmpty()) {
 			log.info("走的缓存");
 			return getSuccessResponseVO(redisList);
@@ -197,7 +197,7 @@ public class CategoryInfoController extends ABaseController {
 		CategoryInfoQuery categoryInfoQuery = new CategoryInfoQuery();
 		categoryInfoQuery.setOrderBy("sort asc");
 		categoryInfoQuery.setConvert2Tree(true);
-		List<com.mybilibili.base.entity.po.CategoryInfo> categoryList = this.categoryInfoService.findListByParam(categoryInfoQuery);
+		List<com.mybilibili.admin.entity.po.CategoryInfo> categoryList = this.categoryInfoService.findListByParam(categoryInfoQuery);
 		adminRedisComponent.saveCategoryList2Redis(categoryList);
 	}
 

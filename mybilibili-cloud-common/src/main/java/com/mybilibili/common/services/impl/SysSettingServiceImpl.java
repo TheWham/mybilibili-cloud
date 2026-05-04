@@ -1,6 +1,6 @@
 package com.mybilibili.common.services.impl;
 
-import com.mybilibili.base.entity.po.SysSetting;
+import com.mybilibili.common.entity.po.SysSetting;
 import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.query.SysSettingQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;

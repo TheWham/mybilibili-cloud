@@ -3,8 +3,9 @@ package com.mybilibili.user.component;
 import com.alibaba.fastjson2.JSON;
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.SysSettingDTO;
-import com.mybilibili.base.entity.po.SysSetting;
+import com.mybilibili.common.entity.po.SysSetting;
 import com.mybilibili.base.entity.vo.UserInfoVO;
+import com.mybilibili.common.convert.SysSettingConverter;
 import com.mybilibili.common.redis.RedisUtils;
 import com.mybilibili.common.services.SysSettingService;
 import com.mybilibili.user.constants.UserRedisKeys;
@@ -124,12 +125,12 @@ public class UserRedisComponent {
         SysSetting sysSettingDb = sysSettingService.getSysSettingById(SYS_SETTING_ID);
         if (sysSettingDb == null) {
             // 注册金币需要系统配置。迁移早期如果配置表为空，先写默认值保证注册链路可用。
-            SysSetting initSetting = SysSettingDTO.createDefault().toSysSetting();
+            SysSetting initSetting = SysSettingConverter.toPO(SysSettingDTO.createDefault());
             initSetting.setId(SYS_SETTING_ID);
             sysSettingService.add(initSetting);
             sysSettingDb = sysSettingService.getSysSettingById(SYS_SETTING_ID);
         }
-        SysSettingDTO sysSettingDTO = SysSettingDTO.fromSysSetting(sysSettingDb);
+        SysSettingDTO sysSettingDTO = SysSettingConverter.toDTO(sysSettingDb);
         redisUtils.set(UserRedisKeys.SYS_SETTING_KEY, sysSettingDTO);
         return sysSettingDTO;
     }

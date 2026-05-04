@@ -2,7 +2,7 @@ package com.mybilibili.admin.provider;
 
 import com.mybilibili.admin.services.CategoryInfoService;
 import com.mybilibili.base.constants.Constants;
-import com.mybilibili.base.entity.po.CategoryInfo;
+import com.mybilibili.admin.entity.po.CategoryInfo;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;

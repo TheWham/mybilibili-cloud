@@ -3,7 +3,7 @@
 		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.mybilibili.common.mappers.SysSettingMapper">
 	<!--实体映射 -->
-	<resultMap id="base_result_map" type="com.mybilibili.base.entity.po.SysSetting">
+	<resultMap id="base_result_map" type="com.mybilibili.common.entity.po.SysSetting">
 		<!-- -->
 		<id column="id" property="id"/>
 		<!-- 注册送硬币数-->
@@ -107,7 +107,7 @@
 	</select>
 
 	<!--插入 -->
-	<insert id="insert" parameterType="com.mybilibili.base.entity.po.SysSetting">
+	<insert id="insert" parameterType="com.mybilibili.common.entity.po.SysSetting">
 		<selectKey keyProperty="bean.id" resultType="Long" order="AFTER">
 			SELECT LAST_INSERT_ID()
 		</selectKey>
@@ -180,7 +180,7 @@
 	</insert>
 
 	<!--insertOrUpdate 过滤掉了唯一索引字段-->
-	<insert id="insertOrUpdate" parameterType="com.mybilibili.base.entity.po.SysSetting">
+	<insert id="insertOrUpdate" parameterType="com.mybilibili.common.entity.po.SysSetting">
 		INSERT INTO sys_setting
 		<trim prefix="(" suffix=")" suffixOverrides=",">
 			<if test="bean.id != null">
@@ -279,7 +279,7 @@
 	</insert>
 
 	<!--批量添加 -->
-	<insert id="insertBatch" parameterType="com.mybilibili.base.entity.po.SysSetting"  useGeneratedKeys="true" keyProperty="id">
+	<insert id="insertBatch" parameterType="com.mybilibili.common.entity.po.SysSetting"  useGeneratedKeys="true" keyProperty="id">
 		INSERT INTO sys_setting(id,register_coin_count,post_video_coin_count,video_size,video_p_count,video_count,comment_count,danmu_count,update_time,update_by) values
 		<foreach collection="list" item="item" separator=",">
 			(
@@ -289,7 +289,7 @@
 	</insert>
 
 	<!--批量新增修改 (没有过滤掉唯一索引字段)-->
-	<insert id="insertOrUpdateBatch" parameterType="com.mybilibili.base.entity.po.SysSetting">
+	<insert id="insertOrUpdateBatch" parameterType="com.mybilibili.common.entity.po.SysSetting">
 		INSERT INTO sys_setting(id,register_coin_count,post_video_coin_count,video_size,video_p_count,video_count,comment_count,danmu_count,update_time,update_by) values
 		<foreach collection="list" item="item" separator=",">
 			(
@@ -312,7 +312,7 @@
 	</delete>
 
 	<!--根据Id更新 -->
-	<update id="updateById" parameterType="com.mybilibili.base.entity.po.SysSetting">
+	<update id="updateById" parameterType="com.mybilibili.common.entity.po.SysSetting">
 		update sys_setting
 		<set>
 			<if test="bean.id != null">

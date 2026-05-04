@@ -3,8 +3,9 @@ package com.mybilibili.admin.component;
 import com.alibaba.fastjson2.JSON;
 import com.mybilibili.admin.constants.AdminRedisKeys;
 import com.mybilibili.base.entity.dto.SysSettingDTO;
-import com.mybilibili.base.entity.po.CategoryInfo;
-import com.mybilibili.base.entity.po.SysSetting;
+import com.mybilibili.admin.entity.po.CategoryInfo;
+import com.mybilibili.common.convert.SysSettingConverter;
+import com.mybilibili.common.entity.po.SysSetting;
 import com.mybilibili.common.redis.RedisUtils;
 import com.mybilibili.common.services.SysSettingService;
 import jakarta.annotation.Resource;
@@ -55,18 +56,18 @@ public class AdminRedisComponent {
         SysSetting sysSettingDb = sysSettingService.getSysSettingById(SYS_SETTING_ID);
         if (sysSettingDb == null) {
             // sys_setting 是单行全局配置，空表时先落默认值，后续统一围绕 id=1 读写。
-            SysSetting initSetting = SysSettingDTO.createDefault().toSysSetting();
+            SysSetting initSetting = SysSettingConverter.toPO(SysSettingDTO.createDefault());
             initSetting.setId(SYS_SETTING_ID);
             sysSettingService.add(initSetting);
             sysSettingDb = sysSettingService.getSysSettingById(SYS_SETTING_ID);
         }
-        SysSettingDTO sysSettingDTO = SysSettingDTO.fromSysSetting(sysSettingDb);
+        SysSettingDTO sysSettingDTO = SysSettingConverter.toDTO(sysSettingDb);
         redisUtils.set(AdminRedisKeys.SYS_SETTING_KEY, sysSettingDTO);
         return sysSettingDTO;
     }
 
     public boolean setSysSetting(SysSettingDTO sysSettingDTO) {
-        SysSetting sysSetting = sysSettingDTO.toSysSetting();
+        SysSetting sysSetting = SysSettingConverter.toPO(sysSettingDTO);
         sysSetting.setId(SYS_SETTING_ID);
 
         SysSetting currentSetting = sysSettingService.getSysSettingById(SYS_SETTING_ID);

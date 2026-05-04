@@ -2,7 +2,7 @@ package com.mybilibili.video.controller;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.mybilibili.base.entity.dto.CategoryDTO;
-import com.mybilibili.base.entity.po.CategoryInfo;
+import com.mybilibili.video.entity.po.CategoryInfo;
 import com.mybilibili.base.entity.query.CategoryInfoQuery;
 import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.vo.PaginationResultVO;

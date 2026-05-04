@@ -3,7 +3,7 @@
 		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.mybilibili.admin.mappers.CategoryInfoMapper">
 	<!--实体映射 -->
-	<resultMap id="base_result_map" type="com.mybilibili.base.entity.po.CategoryInfo">
+	<resultMap id="base_result_map" type="com.mybilibili.admin.entity.po.CategoryInfo">
 		<!-- 自增分类id-->
 		<id column="category_id" property="categoryId"/>
 		<!-- 分类名称-->
@@ -100,7 +100,7 @@
 	</select>
 
 	<!--插入 -->
-	<insert id="insert" parameterType="com.mybilibili.base.entity.po.CategoryInfo">
+	<insert id="insert" parameterType="com.mybilibili.admin.entity.po.CategoryInfo">
 		<selectKey keyProperty="bean.categoryId" resultType="Integer" order="AFTER">
 			SELECT LAST_INSERT_ID()
 		</selectKey>
@@ -149,7 +149,7 @@
 	</insert>
 
 	<!--insertOrUpdate 过滤掉了唯一索引字段-->
-	<insert id="insertOrUpdate" parameterType="com.mybilibili.base.entity.po.CategoryInfo">
+	<insert id="insertOrUpdate" parameterType="com.mybilibili.admin.entity.po.CategoryInfo">
 		INSERT INTO category_info
 		<trim prefix="(" suffix=")" suffixOverrides=",">
 			<if test="bean.categoryId != null">
@@ -218,7 +218,7 @@
 	</insert>
 
 	<!--批量添加 -->
-	<insert id="insertBatch" parameterType="com.mybilibili.base.entity.po.CategoryInfo"  useGeneratedKeys="true" keyProperty="categoryId">
+	<insert id="insertBatch" parameterType="com.mybilibili.admin.entity.po.CategoryInfo"  useGeneratedKeys="true" keyProperty="categoryId">
 		INSERT INTO category_info(category_id,category_name,category_code,p_category_id,background,icon,sort) values
 		<foreach collection="list" item="item" separator=",">
 			(
@@ -228,7 +228,7 @@
 	</insert>
 
 	<!--批量新增修改 (没有过滤掉唯一索引字段)-->
-	<insert id="insertOrUpdateBatch" parameterType="com.mybilibili.base.entity.po.CategoryInfo">
+	<insert id="insertOrUpdateBatch" parameterType="com.mybilibili.admin.entity.po.CategoryInfo">
 		INSERT INTO category_info(category_id,category_name,category_code,p_category_id,background,icon,sort) values
 		<foreach collection="list" item="item" separator=",">
 			(
@@ -255,7 +255,7 @@
 		delete from category_info where category_id=#{categoryIdOrPCategoryId} or p_category_id=#{categoryIdOrPCategoryId}
 	</delete>
 	<!--根据CategoryId更新 -->
-	<update id="updateByCategoryId" parameterType="com.mybilibili.base.entity.po.CategoryInfo">
+	<update id="updateByCategoryId" parameterType="com.mybilibili.admin.entity.po.CategoryInfo">
 		update category_info
 		<set>
 			<if test="bean.categoryId != null">
@@ -307,7 +307,7 @@
 	</delete>
 
 	<!--根据CategoryCode更新 -->
-	<update id="updateByCategoryCode" parameterType="com.mybilibili.base.entity.po.CategoryInfo">
+	<update id="updateByCategoryCode" parameterType="com.mybilibili.admin.entity.po.CategoryInfo">
 		update category_info
 		<set>
 			<if test="bean.categoryId != null">

@@ -5,7 +5,7 @@ import com.mybilibili.admin.component.AdminRedisComponent;
 import com.mybilibili.admin.mappers.CategoryInfoMapper;
 import com.mybilibili.admin.services.CategoryInfoService;
 import com.mybilibili.base.constants.Constants;
-import com.mybilibili.base.entity.po.CategoryInfo;
+import com.mybilibili.admin.entity.po.CategoryInfo;
 import com.mybilibili.base.entity.query.CategoryInfoQuery;
 import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
