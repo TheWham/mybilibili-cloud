@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTO Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mybilibili.video.mappers.UserVideoSeriesMapper">
+	<!--实体映射 -->
+	<resultMap id="base_result_map" type="com.mybilibili.video.entity.po.UserVideoSeries">
+		<!-- 列表id-->
+		<id column="series_id" property="seriesId"/>
+		<!-- 列表名称-->
+		<result column="series_name" property="seriesName"/>
+		<!-- 列表叙述-->
+		<result column="series_description" property="seriesDescription"/>
+		<!-- 排序-->
+		<result column="sort" property="sort"/>
+		<!-- 更新时间-->
+		<result column="update_time" property="updateTime"/>
+		<!-- 用户id-->
+		<result column="user_id" property="userId"/>
+	</resultMap>
+
+	<resultMap id="base_result_map_children" type="com.mybilibili.video.entity.dto.SeriesWithVideoQueryDTO">
+		<id column="series_id" property="seriesId"/>
+		<result column="series_name" property="seriesName"/>
+		<collection property="videoInfoList" column="series_id" select="com.mybilibili.video.mappers.UserVideoSeriesVideoMapper.selectListLimit5"/>
+	</resultMap>
+
+
+	<!--通用查询结果列 -->
+	<sql id="base_column_list">
+		v.series_id,v.series_name,v.series_description,v.sort,v.update_time,v.user_id
+	</sql>
+
+	<!--基础查询条件 -->
+	<sql id="base_query_condition">
+		<if test="query.seriesId != null" >
+			and v.series_id = #{query.seriesId}
+		</if>
+		<if test="query.seriesName != null and query.seriesName != ''" >
+			and v.series_name = #{query.seriesName}
+		</if>
+		<if test="query.seriesDescription != null and query.seriesDescription != ''" >
+			and v.series_description = #{query.seriesDescription}
+		</if>
+		<if test="query.sort != null" >
+			and v.sort = #{query.sort}
+		</if>
+		<if test="query.updateTime != null and query.updateTime != ''" >
+			<![CDATA[ and v.update_time=str_to_date(#{query.updateTime}, '%Y-%m-%d') ]]>
+		</if>
+		<if test="query.userId != null and query.userId != ''" >
+			and v.user_id = #{query.userId}
+		</if>
+	</sql>
+
+	<!--通用条件列 -->
+	<sql id="query_condition">
+		<where>
+			<include refid="base_query_condition" />
+			<include refid="base_query_condition_extend" />
+		</where>
+	</sql>
+
+	<!--拓展查询条件 -->
+	<sql id="base_query_condition_extend">
+		<if test="query.seriesNameFuzzy != null and query.seriesNameFuzzy != ''" >
+			and v.series_name like concat('%', #{query.seriesNameFuzzy}, '%')
+		</if>
+		<if test="query.seriesDescriptionFuzzy != null and query.seriesDescriptionFuzzy != ''" >
+			and v.series_description like concat('%', #{query.seriesDescriptionFuzzy}, '%')
+		</if>
+		<if test="query.updateTimeStart != null and query.updateTimeStart != ''" >
+			<![CDATA[ and v.update_time >= str_to_date(#{query.updateTimeStart}, '%Y-%m-%d')]]>
+		</if>
+		<if test="query.updateTimeEnd != null and query.updateTimeEnd != ''" >
+			<![CDATA[ and v.update_time <= DATE_SUB(str_to_date(#{query.updateTimeEnd}, '%Y-%m-%d'), INTERVAL 1 DAY)]]>
+		</if>
+		<if test="query.userIdFuzzy != null and query.userIdFuzzy != ''" >
+			and v.user_id like concat('%', #{query.userIdFuzzy}, '%')
+		</if>
+	</sql>
+
+	<!--通用查询列表 -->
+	<select id="selectList" resultMap="base_result_map">
+		SELECT
+		<include refid="base_column_list"/>
+		FROM user_video_series v 
+		<include refid="query_condition"/>
+		<if test="query.orderBy!=null">
+			order by ${query.orderBy}
+		</if>
+		<if test="query.simplePage!=null">
+			limit #{query.simplePage.start}, #{query.simplePage.end}
+		</if>
+	</select>
+
+	<!--查询数量 -->
+	<select id="selectCount" resultType="java.lang.Integer">
+		SELECT count(1) FROM user_video_series v 
+		<include refid="query_condition"/>
+	</select>
+
+	<!--根据SeriesId查询 -->
+	<select id="selectBySeriesId" resultMap="base_result_map">
+		select <include refid="base_column_list"/>
+		from user_video_series v where series_id=#{seriesId}
+	</select>
+
+	<select id="selectMaxSort" resultType="java.lang.Integer">
+		SELECT IFNULL(MAX(sort), 0)
+		FROM user_video_series
+		WHERE user_id = #{userId}
+	</select>
+
+	<select id="loadVideoSeries" resultMap="base_result_map">
+		SELECT
+			s.*,
+			v.video_cover as cover
+		FROM
+			user_video_series s
+				LEFT JOIN user_video_series_video sv ON sv.series_id = s.series_id
+				AND sv.sort = ( SELECT min( sort ) FROM user_video_series_video WHERE series_id = s.series_id )
+				LEFT JOIN video_info v ON v.video_id = sv.video_id
+		WHERE
+			s.user_id = #{userId}
+		ORDER BY sort asc
+	</select>
+
+	<select id="selectVideoSeriesWithVideo" resultMap="base_result_map_children">
+		SELECT <include refid="base_column_list"/>
+		FROM user_video_series v
+		WHERE v.user_id = #{userId}
+		ORDER BY v.sort ASC
+	</select>
+	<select id="selectByIds" resultMap="base_result_map">
+		SELECT <include refid="base_column_list"/>
+		FROM user_video_series v
+		WHERE v.series_id in (<foreach collection="list" item="id" separator=",">#{id}</foreach>)
+		AND v.user_id = #{userId};
+	</select>
+
+	<!--插入 -->
+	<insert id="insert" parameterType="com.mybilibili.video.entity.po.UserVideoSeries">
+		<selectKey keyProperty="bean.seriesId" resultType="Integer" order="AFTER">
+			SELECT LAST_INSERT_ID()
+		</selectKey>
+		INSERT INTO user_video_series
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="bean.seriesName != null">
+				series_name,
+			</if>
+			<if test="bean.seriesDescription != null">
+				series_description,
+			</if>
+			<if test="bean.sort != null">
+				sort,
+			</if>
+			<if test="bean.updateTime != null">
+				update_time,
+			</if>
+			<if test="bean.userId != null">
+				user_id,
+			</if>
+		</trim>
+		<trim prefix="values (" suffix=")" suffixOverrides=",">
+			<if test="bean.seriesName != null">
+				#{bean.seriesName},
+			</if>
+			<if test="bean.seriesDescription != null">
+				#{bean.seriesDescription},
+			</if>
+			<if test="bean.sort != null">
+				#{bean.sort},
+			</if>
+			<if test="bean.updateTime != null">
+				#{bean.updateTime},
+			</if>
+			<if test="bean.userId != null">
+				#{bean.userId},
+			</if>
+		</trim>
+
+	</insert>
+
+	<!--insertOrUpdate 过滤掉了唯一索引字段-->
+	<insert id="insertOrUpdate" parameterType="com.mybilibili.video.entity.po.UserVideoSeries">
+		INSERT INTO user_video_series
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="bean.seriesId != null">
+				series_id,
+			</if>
+			<if test="bean.seriesName != null">
+				series_name,
+			</if>
+			<if test="bean.seriesDescription != null">
+				series_description,
+			</if>
+			<if test="bean.sort != null">
+				sort,
+			</if>
+			<if test="bean.updateTime != null">
+				update_time,
+			</if>
+			<if test="bean.userId != null">
+				user_id,
+			</if>
+		</trim>
+		<trim prefix="values (" suffix=")" suffixOverrides=",">
+			<if test="bean.seriesId != null">
+				#{bean.seriesId},
+			</if>
+			<if test="bean.seriesName != null">
+				#{bean.seriesName},
+			</if>
+			<if test="bean.seriesDescription != null">
+				#{bean.seriesDescription},
+			</if>
+			<if test="bean.sort != null">
+				#{bean.sort},
+			</if>
+			<if test="bean.updateTime != null">
+				#{bean.updateTime},
+			</if>
+			<if test="bean.userId != null">
+				#{bean.userId},
+			</if>
+		</trim>
+		on DUPLICATE key update
+		<trim prefix="" suffix="" suffixOverrides=",">
+			<if test="bean.seriesName != null">
+				series_name = VALUES(series_name),
+			</if>
+			<if test="bean.seriesDescription != null">
+				series_description = VALUES(series_description),
+			</if>
+			<if test="bean.sort != null">
+				sort = VALUES(sort),
+			</if>
+			<if test="bean.updateTime != null">
+				update_time = VALUES(update_time),
+			</if>
+			<if test="bean.userId != null">
+				user_id = VALUES(user_id),
+			</if>
+		</trim>
+	</insert>
+
+	<!--批量添加 -->
+	<insert id="insertBatch" parameterType="com.mybilibili.video.entity.po.UserVideoSeries"  useGeneratedKeys="true" keyProperty="seriesId">
+		INSERT INTO user_video_series(series_id,series_name,series_description,sort,update_time,user_id) values
+		<foreach collection="list" item="item" separator=",">
+			(
+			#{item.seriesId},#{item.seriesName},#{item.seriesDescription},#{item.sort},#{item.updateTime},#{item.userId}
+			)
+		</foreach>
+	</insert>
+
+	<!--批量新增修改 (没有过滤掉唯一索引字段)-->
+	<insert id="insertOrUpdateBatch" parameterType="com.mybilibili.video.entity.po.UserVideoSeries">
+		INSERT INTO user_video_series(series_id,series_name,series_description,sort,update_time,user_id) values
+		<foreach collection="list" item="item" separator=",">
+			(
+			#{item.seriesId},#{item.seriesName},#{item.seriesDescription},#{item.sort},#{item.updateTime},#{item.userId}
+			)
+		</foreach>
+		on DUPLICATE key update
+		series_name = VALUES(series_name),series_description = VALUES(series_description),sort = VALUES(sort),update_time = VALUES(update_time),user_id = VALUES(user_id)
+	</insert>
+
+	<!--根据SeriesId删除 -->
+	<delete id="deleteBySeriesIdAndUserId">
+		delete from user_video_series where series_id=#{seriesId} and user_id=#{userId}
+	</delete>
+
+	<!--根据SeriesId更新 -->
+	<update id="updateBySeriesId" parameterType="com.mybilibili.video.entity.po.UserVideoSeries">
+		update user_video_series
+		<set>
+			<if test="bean.seriesId != null">
+				series_id = #{bean.seriesId},
+			</if>
+			<if test="bean.seriesName != null">
+				series_name = #{bean.seriesName},
+			</if>
+			<if test="bean.seriesDescription != null">
+				series_description = #{bean.seriesDescription},
+			</if>
+			<if test="bean.sort != null">
+				sort = #{bean.sort},
+			</if>
+			<if test="bean.updateTime != null">
+				update_time = #{bean.updateTime},
+			</if>
+			<if test="bean.userId != null">
+				user_id = #{bean.userId},
+			</if>
+		</set>
+		where series_id=#{seriesId}
+	</update>
+
+	<update id="updateSeriesSortBatch">
+		UPDATE user_video_series
+		<set>
+			<trim prefix="sort = CASE" suffix="END">
+				<foreach collection="list" item="item">
+					WHEN series_id = #{item.seriesId} THEN #{item.sort}
+				</foreach>
+			</trim>
+		</set>
+		WHERE series_id IN
+		<foreach collection="list" item="item" open="(" separator="," close=")">
+			#{item.seriesId}
+		</foreach>
+		AND user_id = #{userId}
+	</update>
+
+
+</mapper>

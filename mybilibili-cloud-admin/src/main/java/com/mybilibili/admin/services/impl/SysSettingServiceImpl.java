@@ -1,12 +1,12 @@
-package com.mybilibili.common.services.impl;
+package com.mybilibili.admin.services.impl;
 
-import com.mybilibili.common.entity.po.SysSetting;
+import com.mybilibili.admin.entity.po.SysSetting;
+import com.mybilibili.admin.entity.query.SysSettingQuery;
+import com.mybilibili.admin.mappers.SysSettingMapper;
+import com.mybilibili.admin.services.SysSettingService;
 import com.mybilibili.base.entity.query.SimplePage;
-import com.mybilibili.base.entity.query.SysSettingQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.enums.PageSize;
-import com.mybilibili.common.mappers.SysSettingMapper;
-import com.mybilibili.common.services.SysSettingService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 

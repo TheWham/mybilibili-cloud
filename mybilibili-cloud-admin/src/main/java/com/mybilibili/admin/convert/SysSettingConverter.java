@@ -1,13 +1,13 @@
-package com.mybilibili.common.convert;
+package com.mybilibili.admin.convert;
 
+import com.mybilibili.admin.entity.po.SysSetting;
 import com.mybilibili.base.entity.dto.SysSettingDTO;
-import com.mybilibili.common.entity.po.SysSetting;
 
 /**
  * 系统配置 PO/DTO 转换。
  *
- * <p>转换逻辑放在 common，是因为 SysSetting 表模型目前也在 common。
- * base 只保留 DTO 契约，不直接感知任何数据库表模型。</p>
+ * <p>转换逻辑跟随 sys_setting 表模型放在 admin。跨服务只传 DTO，
+ * 避免把后台配置表结构扩散到业务服务。</p>
  */
 public final class SysSettingConverter {
 

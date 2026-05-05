@@ -16,7 +16,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = {"com.mybilibili.video", "com.mybilibili.common"})
 @SpringBootApplication(scanBasePackages = {"com.mybilibili.video", "com.mybilibili.common"})
-@MapperScan({"com.mybilibili.video.mappers", "com.mybilibili.common.mappers"})
+@MapperScan("com.mybilibili.video.mappers")
 public class MyBiliBiliCloudVideoRunApplication {
 
     public static void main(String[] args) {

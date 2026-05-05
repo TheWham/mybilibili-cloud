@@ -3,11 +3,9 @@ package com.mybilibili.user.component;
 import com.alibaba.fastjson2.JSON;
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.SysSettingDTO;
-import com.mybilibili.common.entity.po.SysSetting;
 import com.mybilibili.base.entity.vo.UserInfoVO;
-import com.mybilibili.common.convert.SysSettingConverter;
+import com.mybilibili.common.consumer.AdminSysSettingClient;
 import com.mybilibili.common.redis.RedisUtils;
-import com.mybilibili.common.services.SysSettingService;
 import com.mybilibili.user.constants.UserRedisKeys;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
@@ -25,12 +23,10 @@ import java.util.Set;
 @Component
 public class UserRedisComponent {
 
-    private static final long SYS_SETTING_ID = 1L;
-
     @Resource
     private RedisUtils redisUtils;
     @Resource
-    private SysSettingService sysSettingService;
+    private AdminSysSettingClient adminSysSettingClient;
 
     public UserInfoVO getUserInfoVOInRedis(String userId) {
         Object value = redisUtils.get(UserRedisKeys.USER_INFO_KEY + userId);
@@ -122,15 +118,16 @@ public class UserRedisComponent {
             return JSON.parseObject(JSON.toJSONString(sysSetting), SysSettingDTO.class);
         }
 
-        SysSetting sysSettingDb = sysSettingService.getSysSettingById(SYS_SETTING_ID);
-        if (sysSettingDb == null) {
-            // 注册金币需要系统配置。迁移早期如果配置表为空，先写默认值保证注册链路可用。
-            SysSetting initSetting = SysSettingConverter.toPO(SysSettingDTO.createDefault());
-            initSetting.setId(SYS_SETTING_ID);
-            sysSettingService.add(initSetting);
-            sysSettingDb = sysSettingService.getSysSettingById(SYS_SETTING_ID);
+        SysSettingDTO sysSettingDTO;
+        try {
+            sysSettingDTO = adminSysSettingClient.getSysSetting();
+        } catch (Exception e) {
+            // user 不再拥有 sys_setting 表，admin 暂不可用时用默认注册金币配置兜底。
+            return SysSettingDTO.createDefault();
         }
-        SysSettingDTO sysSettingDTO = SysSettingConverter.toDTO(sysSettingDb);
+        if (sysSettingDTO == null) {
+            return SysSettingDTO.createDefault();
+        }
         redisUtils.set(UserRedisKeys.SYS_SETTING_KEY, sysSettingDTO);
         return sysSettingDTO;
     }

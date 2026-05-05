@@ -2,12 +2,12 @@ package com.mybilibili.admin.component;
 
 import com.alibaba.fastjson2.JSON;
 import com.mybilibili.admin.constants.AdminRedisKeys;
+import com.mybilibili.admin.convert.SysSettingConverter;
+import com.mybilibili.admin.entity.po.SysSetting;
+import com.mybilibili.admin.services.SysSettingService;
 import com.mybilibili.base.entity.dto.SysSettingDTO;
 import com.mybilibili.admin.entity.po.CategoryInfo;
-import com.mybilibili.common.convert.SysSettingConverter;
-import com.mybilibili.common.entity.po.SysSetting;
 import com.mybilibili.common.redis.RedisUtils;
-import com.mybilibili.common.services.SysSettingService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 

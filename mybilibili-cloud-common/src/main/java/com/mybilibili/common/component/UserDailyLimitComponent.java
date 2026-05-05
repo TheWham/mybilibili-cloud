@@ -4,10 +4,8 @@ import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.SysSettingDTO;
 import com.mybilibili.base.enums.UserDailyLimitTypeEnum;
 import com.mybilibili.base.exception.BusinessException;
-import com.mybilibili.common.convert.SysSettingConverter;
-import com.mybilibili.common.entity.po.SysSetting;
+import com.mybilibili.common.consumer.AdminSysSettingClient;
 import com.mybilibili.common.redis.RedisUtils;
-import com.mybilibili.common.services.SysSettingService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -26,13 +24,12 @@ import java.util.Collections;
 @Component
 public class UserDailyLimitComponent {
 
-    private static final long SYS_SETTING_ID = 1L;
     private static final DateTimeFormatter DAY_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     @Resource
     private RedisUtils redisUtils;
     @Resource
-    private SysSettingService sysSettingService;
+    private AdminSysSettingClient adminSysSettingClient;
 
     public void checkDailyLimit(String userId, UserDailyLimitTypeEnum limitType) {
         Integer limitCount = getLimitCount(limitType);
@@ -63,8 +60,16 @@ public class UserDailyLimitComponent {
     }
 
     private Integer getLimitCount(UserDailyLimitTypeEnum limitType) {
-        SysSetting sysSetting = sysSettingService.getSysSettingById(SYS_SETTING_ID);
-        SysSettingDTO sysSettingDTO = SysSettingConverter.toDTO(sysSetting);
+        SysSettingDTO sysSettingDTO;
+        try {
+            sysSettingDTO = adminSysSettingClient.getSysSetting();
+        } catch (Exception e) {
+            // 限制配置读取失败时不阻断主链路，按默认配置继续校验。
+            sysSettingDTO = SysSettingDTO.createDefault();
+        }
+        if (sysSettingDTO == null) {
+            sysSettingDTO = SysSettingDTO.createDefault();
+        }
         return limitType.resolveLimit(sysSettingDTO);
     }
 

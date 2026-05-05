@@ -6,11 +6,9 @@ import com.mybilibili.base.entity.dto.AiSubtitleIndexTaskDTO;
 import com.mybilibili.base.entity.dto.SysSettingDTO;
 import com.mybilibili.base.entity.dto.UploadingFileDTO;
 import com.mybilibili.base.entity.dto.VideoHistoryDeleteDTO;
-import com.mybilibili.common.convert.SysSettingConverter;
-import com.mybilibili.common.entity.po.SysSetting;
+import com.mybilibili.common.consumer.AdminSysSettingClient;
 import com.mybilibili.video.entity.po.CategoryInfo;
 import com.mybilibili.common.redis.RedisUtils;
-import com.mybilibili.common.services.SysSettingService;
 import com.mybilibili.video.constants.VideoRedisKeys;
 import com.mybilibili.video.entity.po.VideoInfoFilePost;
 import jakarta.annotation.Resource;
@@ -34,12 +32,10 @@ import java.util.Set;
 @Component
 public class VideoRedisComponent {
 
-    private static final long SYS_SETTING_ID = 1L;
-
     @Resource
     private RedisUtils redisUtils;
     @Resource
-    private SysSettingService sysSettingService;
+    private AdminSysSettingClient adminSysSettingClient;
 
     public void saveCategoryList2Redis(List<CategoryInfo> categoryList) {
         redisUtils.set(VideoRedisKeys.CATEGORY_KEY, categoryList);
@@ -141,14 +137,16 @@ public class VideoRedisComponent {
             return JSON.parseObject(JSON.toJSONString(sysSetting), SysSettingDTO.class);
         }
 
-        SysSetting sysSettingDb = sysSettingService.getSysSettingById(SYS_SETTING_ID);
-        if (sysSettingDb == null) {
-            SysSetting initSetting = SysSettingConverter.toPO(SysSettingDTO.createDefault());
-            initSetting.setId(SYS_SETTING_ID);
-            sysSettingService.add(initSetting);
-            sysSettingDb = sysSettingService.getSysSettingById(SYS_SETTING_ID);
+        SysSettingDTO sysSettingDTO;
+        try {
+            sysSettingDTO = adminSysSettingClient.getSysSetting();
+        } catch (Exception e) {
+            // video 不直接查配置表。admin 不可用时只做短期兜底，避免投稿/弹幕限制读取直接失败。
+            return SysSettingDTO.createDefault();
         }
-        SysSettingDTO sysSettingDTO = SysSettingConverter.toDTO(sysSettingDb);
+        if (sysSettingDTO == null) {
+            return SysSettingDTO.createDefault();
+        }
         redisUtils.set(VideoRedisKeys.SYS_SETTING_KEY, sysSettingDTO);
         return sysSettingDTO;
     }

@@ -1,6 +1,6 @@
-package com.mybilibili.video.entity.vo;
+package com.mybilibili.base.entity.vo;
 
-import com.mybilibili.video.entity.po.UserVideoSeriesVideo;
+
 
 import java.util.List;
 
@@ -10,7 +10,7 @@ import java.util.List;
 public class SeriesWithVideoUHomeVO {
     private Integer seriesId;
     private String seriesName;
-    private List<UserVideoSeriesVideo> videoInfoList;
+    private List<UserVideoSeriesVideoVO> videoInfoList;
 
 
     public Integer getSeriesId() {
@@ -29,20 +29,12 @@ public class SeriesWithVideoUHomeVO {
         this.seriesName = seriesName;
     }
 
-    public List<UserVideoSeriesVideo> getVideoInfoList() {
+    public List<UserVideoSeriesVideoVO> getVideoInfoList() {
         return videoInfoList;
     }
 
-    public void setVideoInfoList(List<UserVideoSeriesVideo> videoInfoList) {
+    public void setVideoInfoList(List<UserVideoSeriesVideoVO> videoInfoList) {
         this.videoInfoList = videoInfoList;
     }
 
-    @Override
-    public String toString() {
-        return "SeriesWithVideoUHomeVO{" +
-                "seriesId=" + seriesId +
-                ", seriesName='" + seriesName + '\'' +
-                ", videoInfoList=" + videoInfoList +
-                '}';
-    }
 }

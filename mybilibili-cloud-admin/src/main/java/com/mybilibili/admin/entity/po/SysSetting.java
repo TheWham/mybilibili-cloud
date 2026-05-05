@@ -1,4 +1,4 @@
-package com.mybilibili.common.entity.po;
+package com.mybilibili.admin.entity.po;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -9,8 +9,8 @@ import java.util.Date;
 /**
  * 系统配置表模型。
  *
- * <p>当前配置表仍由 common 中的 SysSettingService 管理，所以 PO 暂时留在 common。
- * 业务服务对外只传 SysSettingDTO，避免把表结构继续扩散到 base。</p>
+ * <p>sys_setting 由 admin 服务独占维护。其他服务只通过 SysSettingDTO 读取配置，
+ * 不直接感知这张表的字段和持久化细节。</p>
  *
  * @author amani
  * @since 2026/04/22

@@ -1,5 +1,6 @@
-package com.mybilibili.common.mappers;
+package com.mybilibili.admin.mappers;
 
+import com.mybilibili.common.mappers.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 
 /**

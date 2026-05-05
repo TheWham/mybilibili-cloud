@@ -1,10 +1,10 @@
 package com.mybilibili.video.services;
 
+import com.mybilibili.base.entity.vo.PaginationResultVO;
+import com.mybilibili.video.entity.dto.SeriesWithVideoQueryDTO;
 import com.mybilibili.video.entity.po.UserVideoSeries;
 import com.mybilibili.video.entity.po.VideoInfo;
 import com.mybilibili.video.entity.query.UserVideoSeriesQuery;
-import com.mybilibili.base.entity.vo.PaginationResultVO;
-import com.mybilibili.video.entity.vo.SeriesWithVideoUHomeVO;
 
 import java.util.List;
 
@@ -74,5 +74,5 @@ public interface UserVideoSeriesService {
 
 	Integer delVideoSeries(Integer seriesId, String userId);
 
-	List<SeriesWithVideoUHomeVO> selectVideoSeriesWithVideo(String userId);
+	List<SeriesWithVideoQueryDTO> selectVideoSeriesWithVideo(String userId);
 }

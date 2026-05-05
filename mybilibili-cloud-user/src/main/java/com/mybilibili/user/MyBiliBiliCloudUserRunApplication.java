@@ -16,7 +16,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = {"com.mybilibili.user", "com.mybilibili.common"})
 @SpringBootApplication(scanBasePackages = {"com.mybilibili.user", "com.mybilibili.common"})
-@MapperScan({"com.mybilibili.user.mappers", "com.mybilibili.common.mappers"})
+@MapperScan("com.mybilibili.user.mappers")
 public class MyBiliBiliCloudUserRunApplication {
 
     public static void main(String[] args) {

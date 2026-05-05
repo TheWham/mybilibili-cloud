@@ -1,8 +1,8 @@
-package com.mybilibili.common.services;
+package com.mybilibili.admin.services;
 
 
-import com.mybilibili.common.entity.po.SysSetting;
-import com.mybilibili.base.entity.query.SysSettingQuery;
+import com.mybilibili.admin.entity.po.SysSetting;
+import com.mybilibili.admin.entity.query.SysSettingQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 
 import java.util.List;

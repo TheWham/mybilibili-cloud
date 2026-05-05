@@ -5,10 +5,8 @@ import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.SysSettingDTO;
 import com.mybilibili.base.entity.dto.UploadingFileDTO;
 import com.mybilibili.base.entity.dto.VideoInfoFilePostDTO;
-import com.mybilibili.common.convert.SysSettingConverter;
-import com.mybilibili.common.entity.po.SysSetting;
+import com.mybilibili.common.consumer.AdminSysSettingClient;
 import com.mybilibili.common.redis.RedisUtils;
-import com.mybilibili.common.services.SysSettingService;
 import com.mybilibili.media.constants.MediaRedisKeys;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotEmpty;
@@ -23,12 +21,10 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class MediaRedisComponent {
 
-    private static final long SYS_SETTING_ID = 1L;
-
     @Resource
     private RedisUtils redisUtils;
     @Resource
-    private SysSettingService sysSettingService;
+    private AdminSysSettingClient adminSysSettingClient;
 
     public void saveFileInfo(String userId, UploadingFileDTO uploadingFileDto) {
         String key = MediaRedisKeys.UPLOADING_FILE_INFO_KEY + userId + uploadingFileDto.getUploadId();
@@ -80,14 +76,16 @@ public class MediaRedisComponent {
             return JSON.parseObject(JSON.toJSONString(sysSetting), SysSettingDTO.class);
         }
 
-        SysSetting sysSettingDb = sysSettingService.getSysSettingById(SYS_SETTING_ID);
-        if (sysSettingDb == null) {
-            SysSetting initSetting = SysSettingConverter.toPO(SysSettingDTO.createDefault());
-            initSetting.setId(SYS_SETTING_ID);
-            sysSettingService.add(initSetting);
-            sysSettingDb = sysSettingService.getSysSettingById(SYS_SETTING_ID);
+        SysSettingDTO sysSettingDTO;
+        try {
+            sysSettingDTO = adminSysSettingClient.getSysSetting();
+        } catch (Exception e) {
+            // media 不能直接查 sys_setting，admin 暂不可用时先按默认上传限制兜底。
+            return SysSettingDTO.createDefault();
         }
-        SysSettingDTO sysSettingDTO = SysSettingConverter.toDTO(sysSettingDb);
+        if (sysSettingDTO == null) {
+            return SysSettingDTO.createDefault();
+        }
         redisUtils.set(Constants.REDIS_SYS_SETTING_KEY, sysSettingDTO);
         return sysSettingDTO;
     }

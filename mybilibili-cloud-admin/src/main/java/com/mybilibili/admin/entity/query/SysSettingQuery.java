@@ -1,4 +1,6 @@
-package com.mybilibili.base.entity.query;
+package com.mybilibili.admin.entity.query;
+
+import com.mybilibili.base.entity.query.BaseQuery;
 
 import java.util.Date;
 
