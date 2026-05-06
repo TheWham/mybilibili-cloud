@@ -8,6 +8,7 @@ import java.util.Date;
 
 @Data
 public class VideoInfoUHomeVO {
+    private String videoName;
     private String nickName;
     private Integer playCount;
 

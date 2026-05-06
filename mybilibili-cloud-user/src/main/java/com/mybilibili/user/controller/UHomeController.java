@@ -2,14 +2,19 @@ package com.mybilibili.user.controller;
 
 import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
 import com.mybilibili.base.entity.vo.ResponseVO;
+import com.mybilibili.base.entity.vo.UserCollectionVO;
 import com.mybilibili.common.annotation.LoginInterceptor;
 import com.mybilibili.common.controller.ABaseController;
+import com.mybilibili.user.consumer.VideoInfoClient;
 import com.mybilibili.user.services.UserInfoService;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotEmpty;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 用户主页接口。
@@ -28,6 +33,9 @@ public class UHomeController extends ABaseController {
     @Resource
     private UserInfoService userInfoService;
 
+    @Resource
+    private VideoInfoClient videoInfoClient;
+
     /**
      * 获取用户主页资料。
      *
@@ -40,4 +48,11 @@ public class UHomeController extends ABaseController {
         TokenUserInfoDTO currentUser = getTokenUserInfo();
         return getSuccessResponseVO(userInfoService.getUHomeUserInfo(userId, currentUser));
     }
+
+    @RequestMapping("/loadUserCollection")
+    public ResponseVO loadUserCollection(@RequestParam("pageNo") Integer pageNo, @RequestParam("userId") String userId){
+        List<UserCollectionVO> userCollectionVOS = videoInfoClient.loadUserCollection(pageNo, userId);
+        return getSuccessResponseVO(userCollectionVOS);
+    }
+
 }

@@ -32,4 +32,17 @@ public class UCenterController extends ABaseController {
     {
         return getSuccessResponseVO(videoInfoClient.loadVideoSeriesWithVideo(userId));
     }
+
+    @RequestMapping("/series/loadVideoSeries")
+    public ResponseVO loadVideoSeries(@RequestParam("userId") String userId)
+    {
+        return getSuccessResponseVO(videoInfoClient.loadVideoSeries(userId));
+    }
+
+    @RequestMapping("/loadUserCollection")
+    public ResponseVO loadUserCollection(Integer pageNo, @NotEmpty String userId)
+    {
+        return getSuccessResponseVO(videoInfoClient.loadUserCollection(pageNo, userId));
+    }
+
 }

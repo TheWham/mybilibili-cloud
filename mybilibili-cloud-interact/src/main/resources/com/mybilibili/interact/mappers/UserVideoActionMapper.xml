@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTO Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mybilibili.interact.mappers.UserVideoActionMapper">
+	<!--实体映射 -->
+	<resultMap id="base_result_map" type="com.mybilibili.interact.entity.po.UserVideoAction">
+		<!-- 自增id-->
+		<id column="action_id" property="actionId"/>
+		<!-- 视频Id-->
+		<result column="video_id" property="videoId"/>
+		<!-- 视频用户id-->
+		<result column="video_user_id" property="videoUserId"/>
+		<!-- 0:评论喜欢点赞 1:讨厌评论 2:视频点赞 3:视频收藏 4:视频投币-->
+		<result column="action_type" property="actionType"/>
+		<!-- 数量-->
+		<result column="action_count" property="actionCount"/>
+		<!-- 用户id-->
+		<result column="user_id" property="userId"/>
+		<!-- 操作时间-->
+		<result column="action_time" property="actionTime"/>
+	</resultMap>
+
+	<!--实体映射 -->
+	<resultMap id="action_type_map" type="com.mybilibili.base.entity.vo.UserActionVO">
+		<!-- 0:评论喜欢点赞 1:讨厌评论 2:视频点赞 3:视频收藏 4:视频投币-->
+		<result column="action_type" property="actionType"/>
+		<result column="comment_id" property="commentId"/>
+	</resultMap>
+
+	<!--通用查询结果列 -->
+	<sql id="base_column_list">
+		v.action_id,v.video_id,v.video_user_id,v.action_type,v.action_count,v.user_id,v.action_time
+	</sql>
+
+	<!--基础查询条件 -->
+	<sql id="base_query_condition">
+		<if test="query.actionId != null" >
+			and v.action_id = #{query.actionId}
+		</if>
+		<if test="query.videoId != null and query.videoId != ''" >
+			and v.video_id = #{query.videoId}
+		</if>
+		<if test="query.videoUserId != null and query.videoUserId != ''" >
+			and v.video_user_id = #{query.videoUserId}
+		</if>
+		<if test="query.actionType != null" >
+			and v.action_type = #{query.actionType}
+		</if>
+		<if test="query.actionCount != null" >
+			and v.action_count = #{query.actionCount}
+		</if>
+		<if test="query.userId != null and query.userId != ''" >
+			and v.user_id = #{query.userId}
+		</if>
+		<if test="query.actionTime != null and query.actionTime != ''" >
+			<![CDATA[ and v.action_time=str_to_date(#{query.actionTime}, '%Y-%m-%d') ]]>
+		</if>
+		<if test="query.userActionTypeList != null and query.userActionTypeList.length > 0">
+			and v.action_type in
+            (<foreach collection="query.userActionTypeList" separator="," item="action">#{action}</foreach>)
+		</if>
+	</sql>
+
+	<!--通用条件列 -->
+	<sql id="query_condition">
+		<where>
+			<include refid="base_query_condition" />
+			<include refid="base_query_condition_extend" />
+		</where>
+	</sql>
+
+	<!--拓展查询条件 -->
+	<sql id="base_query_condition_extend">
+		<if test="query.videoIdFuzzy != null and query.videoIdFuzzy != ''" >
+			and v.video_id like concat('%', #{query.videoIdFuzzy}, '%')
+		</if>
+		<if test="query.videoUserIdFuzzy != null and query.videoUserIdFuzzy != ''" >
+			and v.video_user_id like concat('%', #{query.videoUserIdFuzzy}, '%')
+		</if>
+		<if test="query.userIdFuzzy != null and query.userIdFuzzy != ''" >
+			and v.user_id like concat('%', #{query.userIdFuzzy}, '%')
+		</if>
+		<if test="query.actionTimeStart != null and query.actionTimeStart != ''" >
+			<![CDATA[ and v.action_time >= str_to_date(#{query.actionTimeStart}, '%Y-%m-%d')]]>
+		</if>
+		<if test="query.actionTimeEnd != null and query.actionTimeEnd != ''" >
+			<![CDATA[ and v.action_time <= DATE_SUB(str_to_date(#{query.actionTimeEnd}, '%Y-%m-%d'), INTERVAL 1 DAY)]]>
+		</if>
+	</sql>
+
+	<!--通用查询列表 -->
+	<select id="selectList" resultMap="base_result_map">
+		SELECT
+		<include refid="base_column_list"/>
+		FROM user_video_action v
+		<include refid="query_condition"/>
+		<if test="query.orderBy!=null">
+			order by ${query.orderBy}
+		</if>
+		<if test="query.simplePage!=null">
+			limit #{query.simplePage.start}, #{query.simplePage.end}
+		</if>
+	</select>
+
+	<!--查询数量 -->
+	<select id="selectCount" resultType="java.lang.Integer">
+		SELECT count(1) FROM user_video_action v
+		<include refid="query_condition"/>
+	</select>
+
+	<!--插入 -->
+	<insert id="insert" parameterType="com.mybilibili.interact.entity.po.UserVideoAction">
+		<selectKey keyProperty="bean.actionId" resultType="Integer" order="AFTER">
+			SELECT LAST_INSERT_ID()
+		</selectKey>
+		INSERT INTO user_video_action
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="bean.videoId != null">
+				video_id,
+			</if>
+			<if test="bean.videoUserId != null">
+				video_user_id,
+			</if>
+			<if test="bean.actionType != null">
+				action_type,
+			</if>
+			<if test="bean.actionCount != null">
+				action_count,
+			</if>
+			<if test="bean.userId != null">
+				user_id,
+			</if>
+			<if test="bean.actionTime != null">
+				action_time,
+			</if>
+		</trim>
+		<trim prefix="values (" suffix=")" suffixOverrides=",">
+			<if test="bean.videoId != null">
+				#{bean.videoId},
+			</if>
+			<if test="bean.videoUserId != null">
+				#{bean.videoUserId},
+			</if>
+			<if test="bean.actionType != null">
+				#{bean.actionType},
+			</if>
+			<if test="bean.actionCount != null">
+				#{bean.actionCount},
+			</if>
+			<if test="bean.userId != null">
+				#{bean.userId},
+			</if>
+			<if test="bean.actionTime != null">
+				#{bean.actionTime},
+			</if>
+		</trim>
+
+	</insert>
+
+	<!--插入(忽略唯一冲突) -->
+	<insert id="insertIgnore" parameterType="com.mybilibili.interact.entity.po.UserVideoAction">
+		INSERT IGNORE INTO user_video_action(video_id,video_user_id,action_type,action_count,user_id,action_time)
+		values(#{bean.videoId},#{bean.videoUserId},#{bean.actionType},#{bean.actionCount},#{bean.userId},#{bean.actionTime})
+	</insert>
+
+	<!--insertOrUpdate 过滤掉了唯一索引字段-->
+	<insert id="insertOrUpdate" parameterType="com.mybilibili.interact.entity.po.UserVideoAction">
+		INSERT INTO user_video_action
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="bean.actionId != null">
+				action_id,
+			</if>
+			<if test="bean.videoId != null">
+				video_id,
+			</if>
+			<if test="bean.videoUserId != null">
+				video_user_id,
+			</if>
+			<if test="bean.actionType != null">
+				action_type,
+			</if>
+			<if test="bean.actionCount != null">
+				action_count,
+			</if>
+			<if test="bean.userId != null">
+				user_id,
+			</if>
+			<if test="bean.actionTime != null">
+				action_time,
+			</if>
+		</trim>
+		<trim prefix="values (" suffix=")" suffixOverrides=",">
+			<if test="bean.actionId != null">
+				#{bean.actionId},
+			</if>
+			<if test="bean.videoId != null">
+				#{bean.videoId},
+			</if>
+			<if test="bean.videoUserId != null">
+				#{bean.videoUserId},
+			</if>
+			<if test="bean.actionType != null">
+				#{bean.actionType},
+			</if>
+			<if test="bean.actionCount != null">
+				#{bean.actionCount},
+			</if>
+			<if test="bean.userId != null">
+				#{bean.userId},
+			</if>
+			<if test="bean.actionTime != null">
+				#{bean.actionTime},
+			</if>
+		</trim>
+		on DUPLICATE key update
+		<trim prefix="" suffix="" suffixOverrides=",">
+			<if test="bean.videoUserId != null">
+				video_user_id = VALUES(video_user_id),
+			</if>
+			<if test="bean.actionCount != null">
+				action_count = VALUES(action_count),
+			</if>
+			<if test="bean.actionTime != null">
+				action_time = VALUES(action_time),
+			</if>
+		</trim>
+	</insert>
+
+	<!--批量添加 -->
+	<insert id="insertBatch" parameterType="com.mybilibili.interact.entity.po.UserVideoAction" useGeneratedKeys="true" keyProperty="actionId">
+		INSERT INTO user_video_action(action_id,video_id,video_user_id,action_type,action_count,user_id,action_time) values
+		<foreach collection="list" item="item" separator=",">
+			(
+			#{item.actionId},#{item.videoId},#{item.videoUserId},#{item.actionType},#{item.actionCount},#{item.userId},#{item.actionTime}
+			)
+		</foreach>
+	</insert>
+
+	<!--批量新增修改 (没有过滤掉唯一索引字段)-->
+	<insert id="insertOrUpdateBatch" parameterType="com.mybilibili.interact.entity.po.UserVideoAction">
+		INSERT INTO user_video_action(action_id,video_id,video_user_id,action_type,action_count,user_id,action_time) values
+		<foreach collection="list" item="item" separator=",">
+			(
+			#{item.actionId},#{item.videoId},#{item.videoUserId},#{item.actionType},#{item.actionCount},#{item.userId},#{item.actionTime}
+			)
+		</foreach>
+		on DUPLICATE key update
+		video_user_id = VALUES(video_user_id),action_count = VALUES(action_count),action_time = VALUES(action_time)
+	</insert>
+
+	<!--根据ActionId查询 -->
+	<select id="selectByActionId" resultMap="base_result_map">
+		select <include refid="base_column_list"/>
+		from user_video_action where action_id=#{actionId}
+	</select>
+
+	<!--根据ActionId删除 -->
+	<delete id="deleteByActionId">
+		delete from user_video_action where action_id=#{actionId}
+	</delete>
+
+	<!--根据ActionId更新 -->
+	<update id="updateByActionId" parameterType="com.mybilibili.interact.entity.po.UserVideoAction">
+		update user_video_action
+		<set>
+			<if test="bean.actionId != null">
+				action_id = #{bean.actionId},
+			</if>
+			<if test="bean.videoId != null">
+				video_id = #{bean.videoId},
+			</if>
+			<if test="bean.videoUserId != null">
+				video_user_id = #{bean.videoUserId},
+			</if>
+			<if test="bean.actionType != null">
+				action_type = #{bean.actionType},
+			</if>
+			<if test="bean.actionCount != null">
+				action_count = #{bean.actionCount},
+			</if>
+			<if test="bean.userId != null">
+				user_id = #{bean.userId},
+			</if>
+			<if test="bean.actionTime != null">
+				action_time = #{bean.actionTime},
+			</if>
+		</set>
+		where action_id=#{actionId}
+	</update>
+
+	<!--根据VideoIdAndActionTypeAndUserIdAnd查询 -->
+	<select id="selectByVideoIdAndActionTypeAndUserId" resultMap="base_result_map">
+		select <include refid="base_column_list"/>
+		from user_video_action where video_id=#{videoId} and action_type=#{actionType} and user_id=#{userId}
+	</select>
+	<select id="selectSingleAction" resultType="java.lang.Integer">
+		select v.action_id from user_video_action v <include refid="query_condition"/>
+	</select>
+
+	<select id="selectActionTypeList" resultMap="action_type_map">
+		select v.action_type from user_video_action v <include refid="query_condition"/>
+	</select>
+	<select id="sumCoinCount" resultType="java.lang.Integer">
+		SELECT IFNULL(SUM(action_count), 0)
+		FROM user_video_action
+		WHERE video_user_id = #{videoUserId}
+	</select>
+	<!--根据VideoIdAndActionTypeAndUserIdAnd删除 -->
+	<delete id="deleteByVideoIdAndActionTypeAndUserId">
+		delete from user_video_action v
+		<where>
+			<if test="videoId != null and videoId != ''" >
+				and v.video_id = #{videoId}
+			</if>
+			<if test="actionType != null" >
+				and v.action_type = #{actionType}
+			</if>
+			<if test="userId != null and userId != ''" >
+				and v.user_id = #{userId}
+			</if>
+		</where>
+	</delete>
+
+
+</mapper>

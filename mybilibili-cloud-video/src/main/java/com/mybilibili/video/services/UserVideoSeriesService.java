@@ -1,5 +1,6 @@
 package com.mybilibili.video.services;
 
+import com.mybilibili.base.entity.dto.UserVideoSeriesDTO;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.video.entity.dto.SeriesWithVideoQueryDTO;
 import com.mybilibili.video.entity.po.UserVideoSeries;
@@ -68,7 +69,7 @@ public interface UserVideoSeriesService {
 
 	void saveSeriesVideo(Integer seriesId,Integer sort, String videoIds, String userId);
 
-	List<UserVideoSeries> loadVideoSeries(String userId);
+	List<UserVideoSeriesDTO> loadVideoSeries(String userId);
 
 	void changeVideoSeriesSort(String videoSeriesIds, String userId);
 

@@ -2,10 +2,8 @@ package com.mybilibili.video.provider;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.mybilibili.base.constants.Constants;
-import com.mybilibili.base.entity.vo.PaginationResultVO;
-import com.mybilibili.base.entity.vo.SeriesWithVideoUHomeVO;
-import com.mybilibili.base.entity.vo.UserVideoSeriesVideoVO;
-import com.mybilibili.base.entity.vo.VideoInfoUHomeVO;
+import com.mybilibili.base.entity.dto.UserVideoSeriesDTO;
+import com.mybilibili.base.entity.vo.*;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.video.entity.dto.SeriesWithVideoQueryDTO;
 import com.mybilibili.video.entity.dto.UserVideoSeriesVideoQueryDTO;
@@ -15,12 +13,12 @@ import com.mybilibili.video.entity.query.VideoInfoQuery;
 import com.mybilibili.video.services.UserVideoSeriesService;
 import com.mybilibili.video.services.VideoInfoService;
 import jakarta.annotation.Resource;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -71,6 +69,41 @@ public class VideoInfoApi{
             return Collections.emptyList();
         }
         return seriesList.stream().map(this::toUHomeVO).collect(Collectors.toList());
+    }
+
+    @RequestMapping("/series/loadVideoSeries")
+    public List<UserVideoSeriesVO> loadVideoSeries(@RequestParam("userId") String userId) {
+        List<UserVideoSeriesDTO> videoSeriesList = userVideoSeriesService.loadVideoSeries(userId);
+        if (videoSeriesList == null || videoSeriesList.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return videoSeriesList.stream().map(this::toSeriesVO).collect(Collectors.toList());
+    }
+
+    @RequestMapping("/loadUserCollection")
+    public List<UserCollectionVO> loadUserCollection(@RequestParam(value = "pageNo", required = false) Integer pageNo,
+                                                     @RequestParam("userId") String userId
+    )
+    {
+
+    }
+
+    @GetMapping("/collection/loadVideoInfo")
+    public List<UserCollectionVO> loadCollectionVideoInfo(@RequestParam("videoIds") List<String> videoIds) {
+        if (videoIds == null || videoIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<VideoInfo> videoInfoList = videoInfoService.selectByIds(videoIds);
+        if (videoInfoList == null || videoInfoList.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return BeanUtil.copyToList(videoInfoList, UserCollectionVO.class);
+    }
+
+    private UserVideoSeriesVO toSeriesVO(UserVideoSeriesDTO userVideoSeriesDTO)
+    {
+        UserVideoSeriesVO bean = BeanUtil.toBean(userVideoSeriesDTO, UserVideoSeriesVO.class);
+        return bean;
     }
 
     private SeriesWithVideoUHomeVO toUHomeVO(SeriesWithVideoQueryDTO queryDTO) {

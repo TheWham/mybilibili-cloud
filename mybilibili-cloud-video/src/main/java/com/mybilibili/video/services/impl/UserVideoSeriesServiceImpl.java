@@ -1,5 +1,7 @@
 package com.mybilibili.video.services.impl;
 
+import cn.hutool.core.bean.BeanUtil;
+import com.mybilibili.base.entity.dto.UserVideoSeriesDTO;
 import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.enums.PageSize;
@@ -166,8 +168,10 @@ public class UserVideoSeriesServiceImpl implements UserVideoSeriesService {
     }
 
     @Override
-    public List<UserVideoSeries> loadVideoSeries(String userId) {
-        return userVideoSeriesMapper.loadVideoSeries(userId);
+    public List<UserVideoSeriesDTO> loadVideoSeries(String userId) {
+        List<UserVideoSeries> userVideoSeries = userVideoSeriesMapper.loadVideoSeries(userId);
+        List<UserVideoSeriesDTO> userVideoSeriesDTOS = BeanUtil.copyToList(userVideoSeries, UserVideoSeriesDTO.class);
+        return userVideoSeriesDTOS;
     }
 
     @Override
