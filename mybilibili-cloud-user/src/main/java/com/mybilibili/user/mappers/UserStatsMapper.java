@@ -1,6 +1,7 @@
 package com.mybilibili.user.mappers;
 
 import com.mybilibili.common.mappers.BaseMapper;
+import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.Date;
@@ -11,6 +12,7 @@ import java.util.List;
  * @since 2026/03/21
  * 用户数量统计表
  */
+@Mapper
 public interface UserStatsMapper<T, R> extends BaseMapper {
 
 	/**

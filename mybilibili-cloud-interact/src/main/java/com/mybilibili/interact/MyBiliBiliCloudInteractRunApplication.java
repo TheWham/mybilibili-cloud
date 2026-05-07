@@ -1,9 +1,10 @@
 package com.mybilibili.interact;
 
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.openfeign.EnableFeignClients;
-import org.springframework.context.annotation.ComponentScan;
 
 /**
  * 互动服务启动入口。
@@ -14,12 +15,8 @@ import org.springframework.context.annotation.ComponentScan;
  */
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = {"com.mybilibili.interact", "com.mybilibili.common"})
-@ComponentScan(basePackages = {
-        "com.mybilibili.interact",
-        "com.mybilibili.common.aspect",
-        "com.mybilibili.common.controller",
-        "com.mybilibili.common.redis"
-})
+@SpringBootApplication(scanBasePackages = {"com.mybilibili.interact", "com.mybilibili.common"})
+@MapperScan("com.mybilibili.interact.mappers")
 public class MyBiliBiliCloudInteractRunApplication {
 
     public static void main(String[] args) {

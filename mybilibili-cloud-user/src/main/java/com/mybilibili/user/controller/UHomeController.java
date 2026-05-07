@@ -2,7 +2,6 @@ package com.mybilibili.user.controller;
 
 import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
 import com.mybilibili.base.entity.vo.ResponseVO;
-import com.mybilibili.base.entity.vo.UserCollectionVO;
 import com.mybilibili.common.annotation.LoginInterceptor;
 import com.mybilibili.common.controller.ABaseController;
 import com.mybilibili.user.consumer.VideoInfoClient;
@@ -13,8 +12,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * 用户主页接口。
@@ -27,7 +24,8 @@ import java.util.List;
  */
 @Validated
 @RestController
-@RequestMapping("uhome")
+@RequestMapping("/uhome")
+@LoginInterceptor(checkLogin = true)
 public class UHomeController extends ABaseController {
 
     @Resource
@@ -49,10 +47,32 @@ public class UHomeController extends ABaseController {
         return getSuccessResponseVO(userInfoService.getUHomeUserInfo(userId, currentUser));
     }
 
-    @RequestMapping("/loadUserCollection")
-    public ResponseVO loadUserCollection(@RequestParam("pageNo") Integer pageNo, @RequestParam("userId") String userId){
-        List<UserCollectionVO> userCollectionVOS = videoInfoClient.loadUserCollection(pageNo, userId);
-        return getSuccessResponseVO(userCollectionVOS);
+    @RequestMapping("/loadVideoList")
+    public ResponseVO loadUHomeVideoList(@RequestParam("userId") String userId,
+                                         @RequestParam(value = "type", required = false) Integer type,
+                                         @RequestParam(value = "pageNo", required = false) Integer pageNo,
+                                         @RequestParam(value = "videoName", required = false) String videoName,
+                                         @RequestParam(value = "orderType", required = false) Integer orderType)
+    {
+        return getSuccessResponseVO(videoInfoClient.loadVideoList(userId, type, pageNo, videoName, orderType));
     }
 
+    @RequestMapping("/series/loadVideoSeriesWithVideo")
+    public ResponseVO loadVideoSeriesWithVideo(@NotEmpty String userId)
+    {
+        return getSuccessResponseVO(videoInfoClient.loadVideoSeriesWithVideo(userId));
+    }
+
+    @RequestMapping("/series/loadVideoSeries")
+    public ResponseVO loadVideoSeries(@RequestParam("userId") String userId)
+    {
+        return getSuccessResponseVO(videoInfoClient.loadVideoSeries(userId));
+    }
+
+    @RequestMapping("/loadUserCollection")
+    public ResponseVO loadUserCollection(@RequestParam(value = "pageNo", required = false) Integer pageNo,
+                                         @RequestParam(value = "userId") String userId)
+    {
+        return getSuccessResponseVO(videoInfoClient.loadUserCollection(pageNo, userId));
+    }
 }

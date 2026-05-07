@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTO Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mybilibili.interact.mappers.VideoDanmuMapper">
+    <resultMap id="base_result_map" type="com.mybilibili.interact.entity.po.VideoDanmu">
+        <id column="danmu_id" property="danmuId"/>
+        <result column="video_id" property="videoId"/>
+        <result column="file_id" property="fileId"/>
+        <result column="user_id" property="userId"/>
+        <result column="post_time" property="postTime"/>
+        <result column="text" property="text"/>
+        <result column="mode" property="mode"/>
+        <result column="color" property="color"/>
+        <result column="time" property="time"/>
+    </resultMap>
+
+    <sql id="base_column_list">
+        v.danmu_id,v.video_id,v.file_id,v.user_id,v.post_time,v.text,v.mode,v.color,v.time
+    </sql>
+
+    <sql id="base_query_condition">
+        <if test="query.danmuId != null">and v.danmu_id = #{query.danmuId}</if>
+        <if test="query.videoId != null and query.videoId != ''">and v.video_id = #{query.videoId}</if>
+        <if test="query.fileId != null and query.fileId != ''">and v.file_id = #{query.fileId}</if>
+        <if test="query.userId != null and query.userId != ''">and v.user_id = #{query.userId}</if>
+        <if test="query.postTime != null and query.postTime != ''">
+            <![CDATA[ and v.post_time=str_to_date(#{query.postTime}, '%Y-%m-%d') ]]>
+        </if>
+        <if test="query.text != null and query.text != ''">and v.text = #{query.text}</if>
+        <if test="query.mode != null">and v.mode = #{query.mode}</if>
+        <if test="query.color != null and query.color != ''">and v.color = #{query.color}</if>
+        <if test="query.time != null">and v.time = #{query.time}</if>
+    </sql>
+
+    <sql id="base_query_condition_extend">
+        <if test="query.videoIdFuzzy != null and query.videoIdFuzzy != ''">
+            and v.video_id like concat('%', #{query.videoIdFuzzy}, '%')
+        </if>
+        <if test="query.fileIdFuzzy != null and query.fileIdFuzzy != ''">
+            and v.file_id like concat('%', #{query.fileIdFuzzy}, '%')
+        </if>
+        <if test="query.userIdFuzzy != null and query.userIdFuzzy != ''">
+            and v.user_id like concat('%', #{query.userIdFuzzy}, '%')
+        </if>
+        <if test="query.postTimeStart != null and query.postTimeStart != ''">
+            <![CDATA[ and v.post_time >= str_to_date(#{query.postTimeStart}, '%Y-%m-%d')]]>
+        </if>
+        <if test="query.postTimeEnd != null and query.postTimeEnd != ''">
+            <![CDATA[ and v.post_time <= DATE_SUB(str_to_date(#{query.postTimeEnd}, '%Y-%m-%d'), INTERVAL 1 DAY)]]>
+        </if>
+        <if test="query.textFuzzy != null and query.textFuzzy != ''">
+            and v.text like concat('%', #{query.textFuzzy}, '%')
+        </if>
+        <if test="query.colorFuzzy != null and query.colorFuzzy != ''">
+            and v.color like concat('%', #{query.colorFuzzy}, '%')
+        </if>
+    </sql>
+
+    <sql id="query_condition">
+        <where>
+            <include refid="base_query_condition"/>
+            <include refid="base_query_condition_extend"/>
+        </where>
+    </sql>
+
+    <select id="selectList" resultMap="base_result_map">
+        SELECT <include refid="base_column_list"/>
+        FROM video_danmu v
+        <include refid="query_condition"/>
+        <if test="query.orderBy != null">
+            order by ${query.orderBy}
+        </if>
+        <if test="query.simplePage != null">
+            limit #{query.simplePage.start}, #{query.simplePage.end}
+        </if>
+    </select>
+
+    <select id="selectCount" resultType="java.lang.Integer">
+        SELECT count(1) FROM video_danmu v
+        <include refid="query_condition"/>
+    </select>
+
+    <insert id="insert" parameterType="com.mybilibili.interact.entity.po.VideoDanmu">
+        <selectKey keyProperty="bean.danmuId" resultType="Integer" order="AFTER">
+            SELECT LAST_INSERT_ID()
+        </selectKey>
+        INSERT INTO video_danmu
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="bean.videoId != null">video_id,</if>
+            <if test="bean.fileId != null">file_id,</if>
+            <if test="bean.userId != null">user_id,</if>
+            <if test="bean.postTime != null">post_time,</if>
+            <if test="bean.text != null">text,</if>
+            <if test="bean.mode != null">mode,</if>
+            <if test="bean.color != null">color,</if>
+            <if test="bean.time != null">time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="bean.videoId != null">#{bean.videoId},</if>
+            <if test="bean.fileId != null">#{bean.fileId},</if>
+            <if test="bean.userId != null">#{bean.userId},</if>
+            <if test="bean.postTime != null">#{bean.postTime},</if>
+            <if test="bean.text != null">#{bean.text},</if>
+            <if test="bean.mode != null">#{bean.mode},</if>
+            <if test="bean.color != null">#{bean.color},</if>
+            <if test="bean.time != null">#{bean.time},</if>
+        </trim>
+    </insert>
+
+    <insert id="insertOrUpdate" parameterType="com.mybilibili.interact.entity.po.VideoDanmu">
+        INSERT INTO video_danmu
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="bean.danmuId != null">danmu_id,</if>
+            <if test="bean.videoId != null">video_id,</if>
+            <if test="bean.fileId != null">file_id,</if>
+            <if test="bean.userId != null">user_id,</if>
+            <if test="bean.postTime != null">post_time,</if>
+            <if test="bean.text != null">text,</if>
+            <if test="bean.mode != null">mode,</if>
+            <if test="bean.color != null">color,</if>
+            <if test="bean.time != null">time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="bean.danmuId != null">#{bean.danmuId},</if>
+            <if test="bean.videoId != null">#{bean.videoId},</if>
+            <if test="bean.fileId != null">#{bean.fileId},</if>
+            <if test="bean.userId != null">#{bean.userId},</if>
+            <if test="bean.postTime != null">#{bean.postTime},</if>
+            <if test="bean.text != null">#{bean.text},</if>
+            <if test="bean.mode != null">#{bean.mode},</if>
+            <if test="bean.color != null">#{bean.color},</if>
+            <if test="bean.time != null">#{bean.time},</if>
+        </trim>
+        on DUPLICATE key update
+        <trim suffixOverrides=",">
+            <if test="bean.videoId != null">video_id = VALUES(video_id),</if>
+            <if test="bean.fileId != null">file_id = VALUES(file_id),</if>
+            <if test="bean.userId != null">user_id = VALUES(user_id),</if>
+            <if test="bean.postTime != null">post_time = VALUES(post_time),</if>
+            <if test="bean.text != null">text = VALUES(text),</if>
+            <if test="bean.mode != null">mode = VALUES(mode),</if>
+            <if test="bean.color != null">color = VALUES(color),</if>
+            <if test="bean.time != null">time = VALUES(time),</if>
+        </trim>
+    </insert>
+
+    <insert id="insertBatch" parameterType="com.mybilibili.interact.entity.po.VideoDanmu" useGeneratedKeys="true" keyProperty="danmuId">
+        INSERT INTO video_danmu(danmu_id,video_id,file_id,user_id,post_time,text,mode,color,time) values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.danmuId},#{item.videoId},#{item.fileId},#{item.userId},#{item.postTime},#{item.text},#{item.mode},#{item.color},#{item.time})
+        </foreach>
+    </insert>
+
+    <insert id="insertOrUpdateBatch" parameterType="com.mybilibili.interact.entity.po.VideoDanmu">
+        INSERT INTO video_danmu(danmu_id,video_id,file_id,user_id,post_time,text,mode,color,time) values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.danmuId},#{item.videoId},#{item.fileId},#{item.userId},#{item.postTime},#{item.text},#{item.mode},#{item.color},#{item.time})
+        </foreach>
+        on DUPLICATE key update
+        video_id = VALUES(video_id),file_id = VALUES(file_id),user_id = VALUES(user_id),post_time = VALUES(post_time),text = VALUES(text),mode = VALUES(mode),color = VALUES(color),time = VALUES(time)
+    </insert>
+
+    <select id="selectByDanmuId" resultMap="base_result_map">
+        SELECT <include refid="base_column_list"/>
+        FROM video_danmu v WHERE v.danmu_id=#{danmuId}
+    </select>
+
+    <delete id="deleteByDanmuId">
+        DELETE FROM video_danmu WHERE danmu_id=#{danmuId}
+    </delete>
+
+    <update id="updateByDanmuId" parameterType="com.mybilibili.interact.entity.po.VideoDanmu">
+        UPDATE video_danmu
+        <set>
+            <if test="bean.videoId != null">video_id = #{bean.videoId},</if>
+            <if test="bean.fileId != null">file_id = #{bean.fileId},</if>
+            <if test="bean.userId != null">user_id = #{bean.userId},</if>
+            <if test="bean.postTime != null">post_time = #{bean.postTime},</if>
+            <if test="bean.text != null">text = #{bean.text},</if>
+            <if test="bean.mode != null">mode = #{bean.mode},</if>
+            <if test="bean.color != null">color = #{bean.color},</if>
+            <if test="bean.time != null">time = #{bean.time},</if>
+        </set>
+        WHERE danmu_id=#{danmuId}
+    </update>
+</mapper>

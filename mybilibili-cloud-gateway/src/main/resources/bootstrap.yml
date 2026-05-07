@@ -30,7 +30,7 @@ spring:
         - id: mybilibili-cloud-user
           uri: lb://mybilibili-cloud-user
           predicates:
-            - Path=/web/userInfo/**,/web/uhome/**,/web/uHome/**,/web/ucenter/**,/web/user/**,/web/sysSetting/**
+            - Path=/web/userInfo/**,/web/uhome/**,/web/uHome/**,/web/user/**,/web/sysSetting/**
           filters:
             - StripPrefix=1
 
@@ -38,7 +38,7 @@ spring:
         - id: mybilibili-cloud-video
           uri: lb://mybilibili-cloud-video
           predicates:
-            - Path=/web/video/**,/web/category/**
+            - Path=/web/video/**,/web/category/**,/web/history/**
           filters:
             - StripPrefix=1
 
@@ -46,7 +46,7 @@ spring:
         - id: mybilibili-cloud-interact
           uri: lb://mybilibili-cloud-interact
           predicates:
-            - Path=/web/interact/**,/web/action/**,/web/userAction/**,/web/comment/**,/web/danmu/**,/web/history/**
+            - Path=/web/interact/**,/web/action/**,/web/userAction/**,/web/comment/**,/web/danmu/**,/web/ucenter/**
           filters:
             - StripPrefix=1
 
@@ -90,5 +90,4 @@ spring:
           filters:
             - StripPrefix=1
             - AdminFilter
-
 

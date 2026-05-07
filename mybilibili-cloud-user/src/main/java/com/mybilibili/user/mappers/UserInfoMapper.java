@@ -3,6 +3,7 @@ package com.mybilibili.user.mappers;
 
 import com.mybilibili.common.mappers.BaseMapper;
 import com.mybilibili.user.entity.dto.UserCoinCountUpdateDTO;
+import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.Date;
@@ -14,6 +15,7 @@ import java.util.Map;
  * @date 2026/01/07
  * @description 
  */
+@Mapper
 public interface UserInfoMapper<T, R> extends BaseMapper {
 
 	/**

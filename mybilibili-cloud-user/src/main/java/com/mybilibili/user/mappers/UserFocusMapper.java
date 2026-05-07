@@ -1,6 +1,7 @@
 package com.mybilibili.user.mappers;
 
 import com.mybilibili.common.mappers.BaseMapper;
+import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 /**
@@ -8,6 +9,7 @@ import org.apache.ibatis.annotations.Param;
  * @since 2026/03/18
  * 用户关注列表
  */
+@Mapper
 public interface UserFocusMapper<T, R> extends BaseMapper {
 
 	/**

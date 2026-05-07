@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTO Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mybilibili.interact.mappers.UserCommentActionMapper">
+    <resultMap id="base_result_map" type="com.mybilibili.interact.entity.po.UserCommentAction">
+        <id column="action_id" property="actionId"/>
+        <result column="video_id" property="videoId"/>
+        <result column="video_user_id" property="videoUserId"/>
+        <result column="comment_id" property="commentId"/>
+        <result column="action_type" property="actionType"/>
+        <result column="user_id" property="userId"/>
+        <result column="action_time" property="actionTime"/>
+    </resultMap>
+
+    <resultMap id="action_type_map" type="com.mybilibili.base.entity.vo.UserActionVO">
+        <result column="action_type" property="actionType"/>
+        <result column="comment_id" property="commentId"/>
+    </resultMap>
+
+    <sql id="base_column_list">
+        v.action_id,v.video_id,v.video_user_id,v.comment_id,v.action_type,v.user_id,v.action_time
+    </sql>
+
+    <sql id="base_query_condition">
+        <if test="query.actionId != null">
+            and v.action_id = #{query.actionId}
+        </if>
+        <if test="query.videoId != null and query.videoId != ''">
+            and v.video_id = #{query.videoId}
+        </if>
+        <if test="query.videoUserId != null and query.videoUserId != ''">
+            and v.video_user_id = #{query.videoUserId}
+        </if>
+        <if test="query.commentId != null">
+            and v.comment_id = #{query.commentId}
+        </if>
+        <if test="query.actionType != null">
+            and v.action_type = #{query.actionType}
+        </if>
+        <if test="query.userId != null and query.userId != ''">
+            and v.user_id = #{query.userId}
+        </if>
+        <if test="query.actionTime != null and query.actionTime != ''">
+            <![CDATA[ and v.action_time=str_to_date(#{query.actionTime}, '%Y-%m-%d') ]]>
+        </if>
+        <if test="query.userActionTypeList != null and query.userActionTypeList.length > 0">
+            and v.action_type in
+            (<foreach collection="query.userActionTypeList" separator="," item="action">#{action}</foreach>)
+        </if>
+    </sql>
+
+    <sql id="base_query_condition_extend">
+        <if test="query.videoIdFuzzy != null and query.videoIdFuzzy != ''">
+            and v.video_id like concat('%', #{query.videoIdFuzzy}, '%')
+        </if>
+        <if test="query.videoUserIdFuzzy != null and query.videoUserIdFuzzy != ''">
+            and v.video_user_id like concat('%', #{query.videoUserIdFuzzy}, '%')
+        </if>
+        <if test="query.userIdFuzzy != null and query.userIdFuzzy != ''">
+            and v.user_id like concat('%', #{query.userIdFuzzy}, '%')
+        </if>
+        <if test="query.actionTimeStart != null and query.actionTimeStart != ''">
+            <![CDATA[ and v.action_time >= str_to_date(#{query.actionTimeStart}, '%Y-%m-%d')]]>
+        </if>
+        <if test="query.actionTimeEnd != null and query.actionTimeEnd != ''">
+            <![CDATA[ and v.action_time <= DATE_SUB(str_to_date(#{query.actionTimeEnd}, '%Y-%m-%d'), INTERVAL 1 DAY)]]>
+        </if>
+    </sql>
+
+    <sql id="query_condition">
+        <where>
+            <include refid="base_query_condition"/>
+            <include refid="base_query_condition_extend"/>
+        </where>
+    </sql>
+
+    <select id="selectList" resultMap="base_result_map">
+        SELECT <include refid="base_column_list"/>
+        FROM user_comment_action v
+        <include refid="query_condition"/>
+        <if test="query.orderBy != null">
+            order by ${query.orderBy}
+        </if>
+        <if test="query.simplePage != null">
+            limit #{query.simplePage.start}, #{query.simplePage.end}
+        </if>
+    </select>
+
+    <select id="selectCount" resultType="java.lang.Integer">
+        SELECT count(1) FROM user_comment_action v
+        <include refid="query_condition"/>
+    </select>
+
+    <select id="selectActionTypeList" resultMap="action_type_map">
+        SELECT v.action_type,v.comment_id FROM user_comment_action v
+        <include refid="query_condition"/>
+    </select>
+
+    <insert id="insert" parameterType="com.mybilibili.interact.entity.po.UserCommentAction">
+        <selectKey keyProperty="bean.actionId" resultType="Integer" order="AFTER">
+            SELECT LAST_INSERT_ID()
+        </selectKey>
+        INSERT INTO user_comment_action
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="bean.videoId != null">video_id,</if>
+            <if test="bean.videoUserId != null">video_user_id,</if>
+            <if test="bean.commentId != null">comment_id,</if>
+            <if test="bean.actionType != null">action_type,</if>
+            <if test="bean.userId != null">user_id,</if>
+            <if test="bean.actionTime != null">action_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="bean.videoId != null">#{bean.videoId},</if>
+            <if test="bean.videoUserId != null">#{bean.videoUserId},</if>
+            <if test="bean.commentId != null">#{bean.commentId},</if>
+            <if test="bean.actionType != null">#{bean.actionType},</if>
+            <if test="bean.userId != null">#{bean.userId},</if>
+            <if test="bean.actionTime != null">#{bean.actionTime},</if>
+        </trim>
+    </insert>
+
+    <insert id="insertIgnore" parameterType="com.mybilibili.interact.entity.po.UserCommentAction">
+        INSERT IGNORE INTO user_comment_action(video_id,video_user_id,action_type,comment_id,user_id,action_time)
+        values(#{bean.videoId},#{bean.videoUserId},#{bean.actionType},#{bean.commentId},#{bean.userId},#{bean.actionTime})
+    </insert>
+
+    <insert id="insertOrUpdate" parameterType="com.mybilibili.interact.entity.po.UserCommentAction">
+        INSERT INTO user_comment_action
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="bean.actionId != null">action_id,</if>
+            <if test="bean.videoId != null">video_id,</if>
+            <if test="bean.videoUserId != null">video_user_id,</if>
+            <if test="bean.commentId != null">comment_id,</if>
+            <if test="bean.actionType != null">action_type,</if>
+            <if test="bean.userId != null">user_id,</if>
+            <if test="bean.actionTime != null">action_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="bean.actionId != null">#{bean.actionId},</if>
+            <if test="bean.videoId != null">#{bean.videoId},</if>
+            <if test="bean.videoUserId != null">#{bean.videoUserId},</if>
+            <if test="bean.commentId != null">#{bean.commentId},</if>
+            <if test="bean.actionType != null">#{bean.actionType},</if>
+            <if test="bean.userId != null">#{bean.userId},</if>
+            <if test="bean.actionTime != null">#{bean.actionTime},</if>
+        </trim>
+        on DUPLICATE key update
+        <trim suffixOverrides=",">
+            <if test="bean.videoId != null">video_id = VALUES(video_id),</if>
+            <if test="bean.videoUserId != null">video_user_id = VALUES(video_user_id),</if>
+            <if test="bean.actionType != null">action_type = VALUES(action_type),</if>
+            <if test="bean.actionTime != null">action_time = VALUES(action_time),</if>
+        </trim>
+    </insert>
+
+    <insert id="insertBatch" parameterType="com.mybilibili.interact.entity.po.UserCommentAction" useGeneratedKeys="true" keyProperty="actionId">
+        INSERT INTO user_comment_action(action_id,video_id,video_user_id,comment_id,action_type,user_id,action_time) values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.actionId},#{item.videoId},#{item.videoUserId},#{item.commentId},#{item.actionType},#{item.userId},#{item.actionTime})
+        </foreach>
+    </insert>
+
+    <insert id="insertOrUpdateBatch" parameterType="com.mybilibili.interact.entity.po.UserCommentAction">
+        INSERT INTO user_comment_action(action_id,video_id,video_user_id,comment_id,action_type,user_id,action_time) values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.actionId},#{item.videoId},#{item.videoUserId},#{item.commentId},#{item.actionType},#{item.userId},#{item.actionTime})
+        </foreach>
+        on DUPLICATE key update
+        video_id = VALUES(video_id),video_user_id = VALUES(video_user_id),action_type = VALUES(action_type),action_time = VALUES(action_time)
+    </insert>
+
+    <select id="selectByActionId" resultMap="base_result_map">
+        SELECT <include refid="base_column_list"/>
+        FROM user_comment_action v WHERE v.action_id=#{actionId}
+    </select>
+
+    <delete id="deleteByActionId">
+        DELETE FROM user_comment_action WHERE action_id=#{actionId}
+    </delete>
+
+    <update id="updateByActionId" parameterType="com.mybilibili.interact.entity.po.UserCommentAction">
+        UPDATE user_comment_action
+        <set>
+            <if test="bean.videoId != null">video_id = #{bean.videoId},</if>
+            <if test="bean.videoUserId != null">video_user_id = #{bean.videoUserId},</if>
+            <if test="bean.commentId != null">comment_id = #{bean.commentId},</if>
+            <if test="bean.actionType != null">action_type = #{bean.actionType},</if>
+            <if test="bean.userId != null">user_id = #{bean.userId},</if>
+            <if test="bean.actionTime != null">action_time = #{bean.actionTime},</if>
+        </set>
+        WHERE action_id=#{actionId}
+    </update>
+
+    <select id="selectByCommentIdAndUserId" resultMap="base_result_map">
+        SELECT <include refid="base_column_list"/>
+        FROM user_comment_action v WHERE v.comment_id=#{commentId} AND v.user_id=#{userId}
+    </select>
+
+    <select id="selectActionTypeForUpdate" resultType="java.lang.Integer">
+        SELECT action_type FROM user_comment_action
+        WHERE comment_id = #{commentId} AND user_id=#{userId}
+        FOR UPDATE
+    </select>
+
+    <delete id="deleteByCommentIdAndUserId">
+        DELETE FROM user_comment_action WHERE comment_id=#{commentId} AND user_id=#{userId}
+    </delete>
+
+    <update id="updateByCommentIdAndUserId" parameterType="com.mybilibili.interact.entity.po.UserCommentAction">
+        UPDATE user_comment_action
+        <set>
+            <if test="bean.videoId != null">video_id = #{bean.videoId},</if>
+            <if test="bean.videoUserId != null">video_user_id = #{bean.videoUserId},</if>
+            <if test="bean.commentId != null">comment_id = #{bean.commentId},</if>
+            <if test="bean.actionType != null">action_type = #{bean.actionType},</if>
+            <if test="bean.userId != null">user_id = #{bean.userId},</if>
+            <if test="bean.actionTime != null">action_time = #{bean.actionTime},</if>
+        </set>
+        WHERE comment_id=#{commentId} AND user_id=#{userId}
+    </update>
+</mapper>

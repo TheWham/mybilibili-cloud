@@ -25,4 +25,13 @@ public interface VideoInfoClient {
      */
     @GetMapping(Constants.INNER_API_PREFIX + "/collection/loadVideoInfo")
     List<UserCollectionVO> loadCollectionVideoInfo(@RequestParam("videoIds") List<String> videoIds);
+
+    /**
+     * 根据视频 id 查询视频信息。
+     *
+     * @param videoId 视频 id
+     * @return 视频状态 以及评论区是否开启
+     */
+    @GetMapping(Constants.INNER_API_PREFIX + "/checkVideoCommentStatusByVideoId")
+    Boolean checkVideoCommentStatusByVideoId(@RequestParam("videoId") String videoId);
 }

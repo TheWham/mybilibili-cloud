@@ -60,7 +60,7 @@ public interface VideoInfoClient {
      * @return 视频收藏列表
      */
     @GetMapping(Constants.INNER_API_PREFIX + "/loadUserCollection")
-    List<UserCollectionVO> loadUserCollection(@RequestParam(value = "pageNo", required = false) Integer pageNo,
+    PaginationResultVO<UserCollectionVO> loadUserCollection(@RequestParam(value = "pageNo", required = false) Integer pageNo,
                                               @RequestParam("userId") String userId);
 
 }

@@ -23,12 +23,12 @@
         <module>mybilibili-cloud-gateway</module>   <!-- 统一入口、路由、鉴权拦截、限流、跨域 -->
         <module>mybilibili-cloud-admin</module>     <!-- 后台管理、统计看板、审核入口、系统配置 -->
         <module>mybilibili-cloud-user</module>      <!-- 用户资料、关注、用户统计、用户主页 -->
-        <module>mybilibili-cloud-interact</module>  <!-- 点赞、收藏、投币、评论、弹幕、播放历史 -->
+        <module>mybilibili-cloud-interact</module>  <!-- 点赞、收藏、投币、评论、弹幕-->
         <module>mybilibili-cloud-search</module>    <!-- Elasticsearch 视频搜索、索引同步 -->
         <module>mybilibili-cloud-auth</module>      <!-- 登录、注册、Token、管理员登录、权限校验 -->
         <module>mybilibili-cloud-message</module>   <!-- 用户消息、评论通知、点赞通知、系统通知 -->
         <module>mybilibili-cloud-media</module>     <!-- 文件存储、图片上传、视频分片、HLS 资源、缩略图生成 -->
-        <module>mybilibili-cloud-video</module>     <!-- 视频投稿、视频信息、分 P 文件、视频审核、分类 -->
+        <module>mybilibili-cloud-video</module>     <!-- 播放历史 视频投稿、视频信息、分 P 文件、视频审核、分类 -->
         <module>mybilibili-cloud-ai</module>        <!-- 关键词生成、语义向量、相似视频召回、FAQ 问答 -->
     </modules>
 
