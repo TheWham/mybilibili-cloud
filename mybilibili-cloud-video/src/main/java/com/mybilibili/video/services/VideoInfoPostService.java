@@ -1,9 +1,9 @@
 package com.mybilibili.video.services;
 
-import com.mybilibili.video.entity.dto.VideoInfoPostDTO;
+import com.mybilibili.base.entity.dto.VideoInfoPostDTO;
+import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.video.entity.po.VideoInfoPost;
 import com.mybilibili.video.entity.query.VideoInfoPostQuery;
-import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.video.entity.vo.VideoAuditCountVO;
 
 import java.util.List;

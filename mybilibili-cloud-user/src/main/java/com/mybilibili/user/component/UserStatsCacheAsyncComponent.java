@@ -1,10 +1,11 @@
 package com.mybilibili.user.component;
 
-import com.mybilibili.base.entity.query.UserFocusQuery;
+
 import com.mybilibili.base.entity.query.UserInfoQuery;
 import com.mybilibili.base.enums.UserStatsRedisEnum;
 import com.mybilibili.user.entity.po.UserFocus;
 import com.mybilibili.user.entity.po.UserInfo;
+import com.mybilibili.user.entity.query.UserFocusQuery;
 import com.mybilibili.user.entity.vo.UserCountVO;
 import com.mybilibili.user.mappers.UserFocusMapper;
 import com.mybilibili.user.mappers.UserInfoMapper;

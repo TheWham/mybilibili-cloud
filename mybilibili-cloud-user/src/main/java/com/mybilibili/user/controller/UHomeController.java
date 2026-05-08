@@ -1,13 +1,23 @@
 package com.mybilibili.user.controller;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
+import com.mybilibili.base.entity.dto.UserInfoDTO;
 import com.mybilibili.base.entity.vo.ResponseVO;
+import com.mybilibili.base.enums.ResponseCodeEnum;
+import com.mybilibili.base.exception.BusinessException;
 import com.mybilibili.common.annotation.LoginInterceptor;
 import com.mybilibili.common.controller.ABaseController;
 import com.mybilibili.user.consumer.VideoInfoClient;
+import com.mybilibili.user.entity.po.UserInfo;
+import com.mybilibili.user.entity.query.UserFocusQuery;
+import com.mybilibili.user.services.UserFocusService;
 import com.mybilibili.user.services.UserInfoService;
 import jakarta.annotation.Resource;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -34,6 +44,9 @@ public class UHomeController extends ABaseController {
     @Resource
     private VideoInfoClient videoInfoClient;
 
+    @Resource
+    private UserFocusService userFocusService;
+
     /**
      * 获取用户主页资料。
      *
@@ -52,27 +65,97 @@ public class UHomeController extends ABaseController {
                                          @RequestParam(value = "type", required = false) Integer type,
                                          @RequestParam(value = "pageNo", required = false) Integer pageNo,
                                          @RequestParam(value = "videoName", required = false) String videoName,
-                                         @RequestParam(value = "orderType", required = false) Integer orderType)
-    {
+                                         @RequestParam(value = "orderType", required = false) Integer orderType) {
         return getSuccessResponseVO(videoInfoClient.loadVideoList(userId, type, pageNo, videoName, orderType));
     }
 
     @RequestMapping("/series/loadVideoSeriesWithVideo")
-    public ResponseVO loadVideoSeriesWithVideo(@NotEmpty String userId)
-    {
+    public ResponseVO loadVideoSeriesWithVideo(@NotEmpty String userId) {
         return getSuccessResponseVO(videoInfoClient.loadVideoSeriesWithVideo(userId));
     }
 
     @RequestMapping("/series/loadVideoSeries")
-    public ResponseVO loadVideoSeries(@RequestParam("userId") String userId)
-    {
+    public ResponseVO loadVideoSeries(@RequestParam("userId") String userId) {
         return getSuccessResponseVO(videoInfoClient.loadVideoSeries(userId));
     }
 
     @RequestMapping("/loadUserCollection")
     public ResponseVO loadUserCollection(@RequestParam(value = "pageNo", required = false) Integer pageNo,
-                                         @RequestParam(value = "userId") String userId)
-    {
+                                         @RequestParam(value = "userId") String userId) {
         return getSuccessResponseVO(videoInfoClient.loadUserCollection(pageNo, userId));
     }
+    @RequestMapping("/loadFocusList")
+    public ResponseVO loadFocusList(Integer pageNo, Integer pageSize) {
+        UserFocusQuery focusQuery = new UserFocusQuery();
+        focusQuery.setPageNo(pageNo);
+        focusQuery.setPageSize(pageSize);
+        focusQuery.setOrderBy("v.focus_time desc");
+        focusQuery.setUserId(getTokenUserInfo().getUserId());
+        focusQuery.setQueryFocusDetailInfo(true);
+        return getSuccessResponseVO(userFocusService.findListByPage(focusQuery));
+    }
+
+    @RequestMapping("/loadFansList")
+    public ResponseVO loadFansList(Integer pageNo, Integer pageSize) {
+        UserFocusQuery focusQuery = new UserFocusQuery();
+        focusQuery.setPageNo(pageNo);
+        focusQuery.setPageSize(pageSize);
+        focusQuery.setOrderBy("v.focus_time desc");
+        focusQuery.setUserFocusId(getTokenUserInfo().getUserId());
+        focusQuery.setQueryFansDetailInfo(true);
+        return getSuccessResponseVO(userFocusService.findListByPage(focusQuery));
+    }
+
+    @RequestMapping("/focus")
+    public ResponseVO focus(@NotEmpty String focusUserId)
+    {
+        String userId = getTokenUserInfo().getUserId();
+        if (focusUserId.equals(userId))
+            throw new BusinessException("无法关注自己");
+        UserInfo focusUserInfo = userInfoService.getUserInfoByUserId(focusUserId);
+
+        if (focusUserInfo == null)
+            throw new BusinessException(ResponseCodeEnum.CODE_600);
+
+        userFocusService.focus(focusUserId, userId);
+        return getSuccessResponseVO(null);
+    }
+
+    @RequestMapping("/cancelFocus")
+    public ResponseVO cancelFocus(@NotEmpty String focusUserId)
+    {
+        String userId = getTokenUserInfo().getUserId();
+        if (focusUserId.equals(userId))
+            throw new BusinessException("无法取关自己");
+
+        UserInfo focusUserInfo = userInfoService.getUserInfoByUserId(focusUserId);
+
+        if (focusUserInfo == null)
+            throw new BusinessException(ResponseCodeEnum.CODE_600);
+
+        userFocusService.cancelFocus(focusUserId, userId);
+        return getSuccessResponseVO(null);
+    }
+
+    @RequestMapping("/updateUserInfo")
+    public ResponseVO updateUserInfo(@Validated UserInfoDTO userInfoDTO)
+    {
+        TokenUserInfoDTO tokenUserInfo = getTokenUserInfo();
+
+        if (tokenUserInfo == null || !tokenUserInfo.getUserId().equals(userInfoDTO.getUserId()))
+            throw new BusinessException(ResponseCodeEnum.CODE_404);
+
+        UserInfo userInfo = BeanUtil.toBean(userInfoDTO, UserInfo.class);
+        userInfoService.updateUserInfoUHome(tokenUserInfo, userInfo);
+        return getSuccessResponseVO(null);
+    }
+
+
+    @RequestMapping("/saveTheme")
+    public ResponseVO saveTheme(@Max(10) @Min(1) @NotNull Integer theme)
+    {
+        userInfoService.saveTheme(getTokenUserInfo().getUserId(), theme);
+        return getSuccessResponseVO(null);
+    }
+
 }

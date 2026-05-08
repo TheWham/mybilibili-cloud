@@ -1,13 +1,15 @@
 package com.mybilibili.user.services;
 
+import com.mybilibili.base.entity.dto.RegisterDTO;
 import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
+import com.mybilibili.base.entity.dto.WebLoginDTO;
 import com.mybilibili.base.entity.query.UserInfoQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.entity.vo.UserCountVO;
 import com.mybilibili.base.entity.vo.UserInfoVO;
 import com.mybilibili.base.enums.UserStatsRedisEnum;
-import com.mybilibili.base.entity.dto.RegisterDTO;
-import com.mybilibili.base.entity.dto.WebLoginDTO;
+import com.mybilibili.user.entity.vo.UCenterVideoDateVO;
+import com.mybilibili.user.entity.vo.UCenterVideoWeekCountVO;
 import com.mybilibili.user.entity.po.UserInfo;
 
 import java.util.List;
@@ -43,9 +45,8 @@ public interface UserInfoService {
     Integer selectTotalCoinCount(String userId);
     UserCountVO getUserCountInfo(String userId);
 
-    //TODO 接入Video模块后恢复
-    // UCenterVideoDateVO getActualTimeStatisticsInfo(String userId);
-    // List<UCenterVideoWeekCountVO> getWeekStatisticsInfo(UserStatsRedisEnum anEnum, String userId);
+    UCenterVideoDateVO getActualTimeStatisticsInfo(String userId);
+    List<UCenterVideoWeekCountVO> getWeekStatisticsInfo(UserStatsRedisEnum anEnum, String userId);
 
     Integer changeStatus(String userId, Integer type);
 }

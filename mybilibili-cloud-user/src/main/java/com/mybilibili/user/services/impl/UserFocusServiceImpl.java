@@ -2,13 +2,13 @@ package com.mybilibili.user.services.impl;
 
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.query.SimplePage;
-import com.mybilibili.base.entity.query.UserFocusQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.enums.UserStatsRedisEnum;
 import com.mybilibili.base.exception.BusinessException;
 import com.mybilibili.user.component.UserRedisComponent;
 import com.mybilibili.user.entity.po.UserFocus;
+import com.mybilibili.user.entity.query.UserFocusQuery;
 import com.mybilibili.user.mappers.UserFocusMapper;
 import com.mybilibili.user.services.UserFocusService;
 import jakarta.annotation.Resource;

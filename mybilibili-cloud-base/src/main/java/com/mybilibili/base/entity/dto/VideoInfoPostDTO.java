@@ -1,9 +1,11 @@
-package com.mybilibili.video.entity.dto;
+package com.mybilibili.base.entity.dto;
 
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+
+import java.util.Date;
 
 public class VideoInfoPostDTO {
 
@@ -29,6 +31,42 @@ public class VideoInfoPostDTO {
     private Integer transferResult;
     private Integer updateType;
     private Integer duration;
+    private Date createTime;
+    private Date lastUpdateTime;
+    private Integer status;
+    private String statusName;
+
+    public Date getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(Date createTime) {
+        this.createTime = createTime;
+    }
+
+    public Date getLastUpdateTime() {
+        return lastUpdateTime;
+    }
+
+    public void setLastUpdateTime(Date lastUpdateTime) {
+        this.lastUpdateTime = lastUpdateTime;
+    }
+
+    public Integer getStatus() {
+        return status;
+    }
+
+    public void setStatus(Integer status) {
+        this.status = status;
+    }
+
+    public String getStatusName() {
+        return statusName;
+    }
+
+    public void setStatusName(String statusName) {
+        this.statusName = statusName;
+    }
 
     public Integer getTransferResult() {
         return transferResult;

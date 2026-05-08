@@ -4,9 +4,13 @@ import cn.hutool.core.bean.BeanUtil;
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.UserActionSyncDTO;
 import com.mybilibili.base.entity.dto.UserVideoSeriesDTO;
+import com.mybilibili.base.entity.dto.VideoInfoDTO;
+import com.mybilibili.base.entity.dto.VideoInfoFilePostDTO;
+import com.mybilibili.base.entity.dto.VideoInfoPostDTO;
 import com.mybilibili.base.entity.vo.*;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.enums.ResponseCodeEnum;
+import com.mybilibili.base.enums.VideoStatusEnum;
 import com.mybilibili.base.exception.BusinessException;
 import com.mybilibili.video.consumer.UserVideoActionClient;
 import com.mybilibili.video.entity.dto.SeriesWithVideoQueryDTO;
@@ -14,12 +18,17 @@ import com.mybilibili.video.entity.dto.UserVideoSeriesVideoQueryDTO;
 import com.mybilibili.video.entity.enums.VideoOrderTypeEnum;
 import com.mybilibili.video.entity.po.VideoInfo;
 import com.mybilibili.video.entity.po.VideoInfoFilePost;
+import com.mybilibili.video.entity.po.VideoInfoPost;
+import com.mybilibili.video.entity.query.VideoInfoFilePostQuery;
+import com.mybilibili.video.entity.query.VideoInfoPostQuery;
 import com.mybilibili.video.entity.query.VideoInfoQuery;
 import com.mybilibili.video.services.UserVideoSeriesService;
 import com.mybilibili.video.services.VideoInfoFilePostService;
+import com.mybilibili.video.services.VideoInfoPostService;
 import com.mybilibili.video.services.VideoInfoService;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -41,6 +50,9 @@ public class VideoInfoApi{
 
     @Resource
     private VideoInfoFilePostService videoInfoFilePostService;
+
+    @Resource
+    private VideoInfoPostService videoInfoPostService;
 
 
     @RequestMapping( "/loadVideoList")
@@ -122,6 +134,109 @@ public class VideoInfoApi{
         return userCollectionPage;
     }
 
+    /**
+     * 用户中心投稿列表。
+     *
+     * <p>这里返回 base 模块里的 DTO，不把 video 模块的投稿 PO 暴露给 user 服务。
+     * 微服务之间只认稳定契约，表字段调整时就不会直接影响调用方。</p>
+     */
+    @RequestMapping("/ucenter/loadVideoList")
+    public PaginationResultVO<VideoInfoPostDTO> loadUCenterVideoList(@RequestParam(value = "pageNo", required = false) Integer pageNo,
+                                                                     @RequestParam(value = "videoNameFuzzy", required = false) String videoNameFuzzy,
+                                                                     @RequestParam(value = "status", required = false) Integer status,
+                                                                     @RequestParam("userId") String userId) {
+        VideoInfoPostQuery query = new VideoInfoPostQuery();
+        query.setUserId(userId);
+        query.setPageNo(pageNo);
+        query.setVideoNameFuzzy(videoNameFuzzy);
+        query.setOrderBy("v.create_time desc");
+        query.setQueryCountInfo(true);
+        if (status != null && status == -1) {
+            query.setExcludeStatusArray(new Integer[]{VideoStatusEnum.STATUS_3.getStatus(), VideoStatusEnum.STATUS_4.getStatus()});
+        } else {
+            query.setStatus(status);
+        }
+
+        PaginationResultVO<VideoInfoPost> page = videoInfoPostService.findListByPage(query);
+        return copyPage(page, VideoInfoPostDTO.class);
+    }
+
+    /**
+     * 查询当前用户投稿在各审核状态下的数量。
+     */
+    @RequestMapping("/ucenter/getVideoCountInfo")
+    public VideoAuditCountVO getVideoCountInfo(@RequestParam("userId") String userId) {
+        com.mybilibili.video.entity.vo.VideoAuditCountVO countInfo = videoInfoPostService.getVideoCountInfo(userId);
+        return BeanUtil.toBean(countInfo, VideoAuditCountVO.class);
+    }
+
+    /**
+     * 查询投稿编辑页回显数据。
+     *
+     * <p>权限校验放在 video 服务内做，避免调用方绕过 Feign 直接拼业务数据。</p>
+     */
+    @RequestMapping("/ucenter/getVideoByVideoId")
+    public VideoInfoPostEditVO getVideoByVideoId(@RequestParam("videoId") String videoId,
+                                                 @RequestParam("userId") String userId) {
+        VideoInfoPost videoInfoPost = videoInfoPostService.getVideoInfoPostByVideoId(videoId);
+        if (videoInfoPost == null || !userId.equals(videoInfoPost.getUserId())) {
+            throw new BusinessException(ResponseCodeEnum.CODE_404);
+        }
+
+        VideoInfoFilePostQuery fileQuery = new VideoInfoFilePostQuery();
+        fileQuery.setVideoId(videoId);
+        fileQuery.setUserId(userId);
+        fileQuery.setOrderBy("file_index asc");
+        List<VideoInfoFilePost> fileList = videoInfoFilePostService.findListByParam(fileQuery);
+
+        VideoInfoPostEditVO editVO = new VideoInfoPostEditVO();
+        editVO.setVideoInfo(BeanUtil.toBean(videoInfoPost, VideoInfoPostDTO.class));
+        editVO.setVideoInfoFileList(BeanUtil.copyToList(fileList, VideoInfoFilePostDTO.class));
+        return editVO;
+    }
+
+    /**
+     * 保存投稿信息。userId 来自调用方登录态，video 服务只负责落库和投稿业务处理。
+     */
+    @RequestMapping("/ucenter/postVideo")
+    public void postVideo(@RequestBody VideoInfoPostDTO videoInfoPostDTO) {
+        videoInfoPostService.savePostVideoInfo(videoInfoPostDTO);
+    }
+
+    /**
+     * 删除用户自己的投稿视频。
+     */
+    @RequestMapping("/ucenter/deleteVideo")
+    public void deleteVideo(@RequestParam("videoId") String videoId,
+                            @RequestParam("userId") String userId) {
+        videoInfoFilePostService.deleVideo(videoId, userId, false);
+    }
+
+    /**
+     * 保存视频互动设置，先校验视频归属，避免跨用户修改。
+     */
+    @RequestMapping("/ucenter/saveVideoInteraction")
+    public void saveVideoInteraction(@RequestParam("videoId") String videoId,
+                                     @RequestParam("userId") String userId,
+                                     @RequestParam(value = "interaction", required = false) String interaction) {
+        VideoInfoPost videoInfoPost = videoInfoPostService.getVideoInfoPostByVideoId(videoId);
+        if (videoInfoPost == null || !userId.equals(videoInfoPost.getUserId())) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600);
+        }
+        videoInfoPost.setInteraction(interaction);
+        videoInfoPostService.saveVideoInteraction(videoInfoPost);
+    }
+
+    /**
+     * 查询当前用户的全部公开视频，用于用户中心下拉选择等轻量场景。
+     */
+    @RequestMapping("/ucenter/loadAllVideo")
+    public List<VideoInfoDTO> loadAllVideo(@RequestParam("userId") String userId) {
+        VideoInfoQuery videoInfoQuery = new VideoInfoQuery();
+        videoInfoQuery.setUserId(userId);
+        return BeanUtil.copyToList(videoInfoService.findListByParam(videoInfoQuery), VideoInfoDTO.class);
+    }
+
     @RequestMapping("/collection/loadVideoInfo")
     public List<UserCollectionVO> loadCollectionVideoInfo(@RequestParam("videoIds") List<String> videoIds) {
         if (videoIds == null || videoIds.isEmpty()) {
@@ -168,6 +283,16 @@ public class VideoInfoApi{
     {
         UserVideoSeriesVO bean = BeanUtil.toBean(userVideoSeriesDTO, UserVideoSeriesVO.class);
         return bean;
+    }
+
+    private <S, T> PaginationResultVO<T> copyPage(PaginationResultVO<S> sourcePage, Class<T> targetClass) {
+        PaginationResultVO<T> targetPage = new PaginationResultVO<>();
+        targetPage.setTotalCount(sourcePage.getTotalCount());
+        targetPage.setPageSize(sourcePage.getPageSize());
+        targetPage.setPageNo(sourcePage.getPageNo());
+        targetPage.setPageTotal(sourcePage.getPageTotal());
+        targetPage.setList(BeanUtil.copyToList(sourcePage.getList(), targetClass));
+        return targetPage;
     }
 
     private SeriesWithVideoUHomeVO toUHomeVO(SeriesWithVideoQueryDTO queryDTO) {

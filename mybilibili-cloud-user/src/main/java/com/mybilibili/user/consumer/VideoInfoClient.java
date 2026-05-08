@@ -1,9 +1,13 @@
 package com.mybilibili.user.consumer;
 
 import com.mybilibili.base.constants.Constants;
+import com.mybilibili.base.entity.dto.VideoInfoDTO;
+import com.mybilibili.base.entity.dto.VideoInfoPostDTO;
 import com.mybilibili.base.entity.vo.*;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
@@ -62,5 +66,38 @@ public interface VideoInfoClient {
     @GetMapping(Constants.INNER_API_PREFIX + "/loadUserCollection")
     PaginationResultVO<UserCollectionVO> loadUserCollection(@RequestParam(value = "pageNo", required = false) Integer pageNo,
                                               @RequestParam("userId") String userId);
+
+
+    @GetMapping(Constants.INNER_API_PREFIX + "/ucenter/loadVideoList")
+    PaginationResultVO<VideoInfoPostDTO> loadUCenterVideoList(@RequestParam(value = "pageNo", required = false) Integer pageNo,
+                                                              @RequestParam(value = "videoNameFuzzy", required = false) String videoNameFuzzy,
+                                                              @RequestParam(value = "status", required = false) Integer status,
+                                                              @RequestParam("userId") String userId);
+
+    /**
+     * 获取视频所处各自状态的数量
+     * @return
+     */
+    @GetMapping(Constants.INNER_API_PREFIX + "/ucenter/getVideoCountInfo")
+    VideoAuditCountVO getVideoCountInfo(@RequestParam("userId") String userId);
+
+    @GetMapping(Constants.INNER_API_PREFIX + "/ucenter/getVideoByVideoId")
+    VideoInfoPostEditVO getVideoByVideoId(@RequestParam("videoId") String videoId,
+                                          @RequestParam("userId") String userId);
+
+    @PostMapping(Constants.INNER_API_PREFIX + "/ucenter/postVideo")
+    void postVideo(@RequestBody VideoInfoPostDTO videoInfoPostDTO);
+
+    @GetMapping(Constants.INNER_API_PREFIX + "/ucenter/deleteVideo")
+    void deleteVideo(@RequestParam("videoId") String videoId,
+                     @RequestParam("userId") String userId);
+
+    @GetMapping(Constants.INNER_API_PREFIX + "/ucenter/saveVideoInteraction")
+    void saveVideoInteraction(@RequestParam("videoId") String videoId,
+                              @RequestParam("userId") String userId,
+                              @RequestParam("interaction") String interaction);
+
+    @GetMapping(Constants.INNER_API_PREFIX + "/ucenter/loadAllVideo")
+    List<VideoInfoDTO> loadAllVideo(@RequestParam("userId") String userId);
 
 }

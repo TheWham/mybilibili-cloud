@@ -1,8 +1,9 @@
 package com.mybilibili.user.services;
 
-import com.mybilibili.base.entity.query.UserFocusQuery;
+
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.user.entity.po.UserFocus;
+import com.mybilibili.user.entity.query.UserFocusQuery;
 
 import java.util.List;
 

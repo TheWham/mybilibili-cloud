@@ -5,9 +5,7 @@ import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.RegisterDTO;
 import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
 import com.mybilibili.base.entity.dto.WebLoginDTO;
-import com.mybilibili.user.entity.po.UserStats;
 import com.mybilibili.base.entity.query.SimplePage;
-import com.mybilibili.base.entity.query.UserFocusQuery;
 import com.mybilibili.base.entity.query.UserInfoQuery;
 import com.mybilibili.base.entity.query.UserStatsQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
@@ -22,6 +20,11 @@ import com.mybilibili.user.component.UserRedisComponent;
 import com.mybilibili.user.component.UserStatsCacheAsyncComponent;
 import com.mybilibili.user.entity.po.UserFocus;
 import com.mybilibili.user.entity.po.UserInfo;
+import com.mybilibili.user.entity.po.UserStats;
+import com.mybilibili.user.entity.query.UserFocusQuery;
+import com.mybilibili.user.entity.vo.TotalCountInfoVO;
+import com.mybilibili.user.entity.vo.UCenterVideoDateVO;
+import com.mybilibili.user.entity.vo.UCenterVideoWeekCountVO;
 import com.mybilibili.user.enums.StatusEnum;
 import com.mybilibili.user.mappers.UserFocusMapper;
 import com.mybilibili.user.mappers.UserInfoMapper;
@@ -33,10 +36,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service("UserInfoService")
 @Slf4j
@@ -321,17 +329,92 @@ public class UserInfoServiceImpl implements UserInfoService {
         userInfoVO.setPlayCount(userStatsMap.getOrDefault(UserStatsRedisEnum.VIDEO_PLAY.getField(), 0));
     }
 
-    //TODO 接入Video模块后恢复此方法
-    // @Override
-    // public UCenterVideoDateVO getActualTimeStatisticsInfo(String userId) {
-    //     ...
-    // }
+    @Override
+    public UCenterVideoDateVO getActualTimeStatisticsInfo(String userId) {
+        UserInfo userInfo = userInfoMapper.selectByUserId(userId);
+        Optional.ofNullable(userInfo).orElseThrow(() -> new BusinessException(ResponseCodeEnum.CODE_600));
 
-    //TODO 接入Video模块后恢复此方法
-    // @Override
-    // public List<UCenterVideoWeekCountVO> getWeekStatisticsInfo(UserStatsRedisEnum anEnum, String userId) {
-    //     ...
-    // }
+        UCenterVideoDateVO dateVO = new UCenterVideoDateVO();
+        dateVO.setPreDayData(new Integer[]{0, 0, 0, 0, 0, 0, 0});
+
+        HashMap<String, Integer> realtimeStatsMap = userRedisComponent.getRealtimeUserStatsInfo(userId);
+        if (realtimeStatsMap != null && !realtimeStatsMap.isEmpty()) {
+            userRedisComponent.refreshRealtimeUserStatsExpire(userId);
+            dateVO.setTotalCountInfo(buildTotalCountInfoFromRedis(realtimeStatsMap));
+            return dateVO;
+        }
+
+        UserStats userStats = userStatsMapper.selectLatestByUserId(userId);
+        dateVO.setTotalCountInfo(buildTotalCountInfoFromDb(userStats));
+        return dateVO;
+    }
+
+    @Override
+    public List<UCenterVideoWeekCountVO> getWeekStatisticsInfo(UserStatsRedisEnum statsType, String userId) {
+        UserInfo userInfo = userInfoMapper.selectByUserId(userId);
+        Optional.ofNullable(userInfo).orElseThrow(() -> new BusinessException(ResponseCodeEnum.CODE_600));
+
+        UserStatsQuery query = new UserStatsQuery();
+        query.setUserId(userId);
+        query.setPageNo(1);
+        query.setPageSize(7);
+        query.setOrderBy("v.stats_day desc");
+        List<UserStats> statsList = userStatsMapper.selectList(query);
+
+        // 补齐最近 7 天的数据点，前端画趋势图时不需要再处理缺失日期。
+        Map<LocalDate, Integer> countMap = statsList.stream()
+                .filter(userStats -> userStats.getStatsDay() != null)
+                .collect(Collectors.toMap(userStats -> userStats.getStatsDay().toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
+                        userStats -> getStatsCountByType(userStats, statsType),
+                        (oldValue, newValue) -> newValue));
+
+        List<UCenterVideoWeekCountVO> result = new ArrayList<>(7);
+        LocalDate today = LocalDate.now();
+        for (int i = 6; i >= 0; i--) {
+            LocalDate statisticsDate = today.minusDays(i);
+            UCenterVideoWeekCountVO weekCountVO = new UCenterVideoWeekCountVO();
+            weekCountVO.setStatisticsDate(Date.from(statisticsDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+            weekCountVO.setStatisticsCount(countMap.getOrDefault(statisticsDate, 0));
+            result.add(weekCountVO);
+        }
+        return result;
+    }
+
+    private TotalCountInfoVO buildTotalCountInfoFromRedis(HashMap<String, Integer> statsMap) {
+        TotalCountInfoVO totalCountInfoVO = new TotalCountInfoVO();
+        totalCountInfoVO.setFansCount(statsMap.getOrDefault(UserStatsRedisEnum.USER_FANS.getField(), 0));
+        totalCountInfoVO.setPlayCount(statsMap.getOrDefault(UserStatsRedisEnum.VIDEO_PLAY.getField(), 0));
+        totalCountInfoVO.setCommentCount(statsMap.getOrDefault(UserStatsRedisEnum.USER_COMMENT_COUNT.getField(), 0));
+        totalCountInfoVO.setDanmuCount(statsMap.getOrDefault(UserStatsRedisEnum.VIDEO_DANMU.getField(), 0));
+        totalCountInfoVO.setLikeCount(statsMap.getOrDefault(UserStatsRedisEnum.VIDEO_LIKE.getField(), 0));
+        totalCountInfoVO.setCoinCount(statsMap.getOrDefault(UserStatsRedisEnum.VIDEO_COIN.getField(), 0));
+        totalCountInfoVO.setCollectCount(statsMap.getOrDefault(UserStatsRedisEnum.USER_COLLECT_COUNT.getField(), 0));
+        return totalCountInfoVO;
+    }
+
+    private TotalCountInfoVO buildTotalCountInfoFromDb(UserStats userStats) {
+        if (userStats == null) {
+            return new TotalCountInfoVO(0, 0, 0, 0, 0, 0, 0);
+        }
+        return BeanUtil.toBean(userStats, TotalCountInfoVO.class);
+    }
+
+    private Integer getStatsCountByType(UserStats userStats, UserStatsRedisEnum statsType) {
+        if (statsType == null || userStats == null) {
+            return 0;
+        }
+        return switch (statsType) {
+            case VIDEO_LIKE -> Optional.ofNullable(userStats.getLikeCount()).orElse(0);
+            case VIDEO_PLAY -> Optional.ofNullable(userStats.getPlayCount()).orElse(0);
+            case VIDEO_DANMU -> Optional.ofNullable(userStats.getDanmuCount()).orElse(0);
+            case VIDEO_COIN -> Optional.ofNullable(userStats.getCoinCount()).orElse(0);
+            case USER_FOCUS -> Optional.ofNullable(userStats.getFocusCount()).orElse(0);
+            case USER_FANS -> Optional.ofNullable(userStats.getFansCount()).orElse(0);
+            case USER_COIN -> Optional.ofNullable(userStats.getCurrentCoinCount()).orElse(0);
+            case USER_COMMENT_COUNT -> Optional.ofNullable(userStats.getCommentCount()).orElse(0);
+            case USER_COLLECT_COUNT -> Optional.ofNullable(userStats.getCollectCount()).orElse(0);
+        };
+    }
 
     @Override
     public Integer changeStatus(String userId, Integer type) {
