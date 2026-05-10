@@ -8,10 +8,10 @@ import com.mybilibili.base.enums.ResponseCodeEnum;
 import com.mybilibili.base.exception.BusinessException;
 import com.mybilibili.common.annotation.LoginInterceptor;
 import com.mybilibili.common.controller.ABaseController;
-import com.mybilibili.user.consumer.VideoInfoClient;
 import com.mybilibili.user.entity.po.UserInfo;
 import com.mybilibili.user.entity.query.UserFocusQuery;
 import com.mybilibili.user.services.UserFocusService;
+import com.mybilibili.user.services.UHomeService;
 import com.mybilibili.user.services.UserInfoService;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.Max;
@@ -42,7 +42,7 @@ public class UHomeController extends ABaseController {
     private UserInfoService userInfoService;
 
     @Resource
-    private VideoInfoClient videoInfoClient;
+    private UHomeService uHomeService;
 
     @Resource
     private UserFocusService userFocusService;
@@ -66,23 +66,23 @@ public class UHomeController extends ABaseController {
                                          @RequestParam(value = "pageNo", required = false) Integer pageNo,
                                          @RequestParam(value = "videoName", required = false) String videoName,
                                          @RequestParam(value = "orderType", required = false) Integer orderType) {
-        return getSuccessResponseVO(videoInfoClient.loadVideoList(userId, type, pageNo, videoName, orderType));
+        return getSuccessResponseVO(uHomeService.loadVideoList(userId, type, pageNo, videoName, orderType));
     }
 
     @RequestMapping("/series/loadVideoSeriesWithVideo")
     public ResponseVO loadVideoSeriesWithVideo(@NotEmpty String userId) {
-        return getSuccessResponseVO(videoInfoClient.loadVideoSeriesWithVideo(userId));
+        return getSuccessResponseVO(uHomeService.loadVideoSeriesWithVideo(userId));
     }
 
     @RequestMapping("/series/loadVideoSeries")
     public ResponseVO loadVideoSeries(@RequestParam("userId") String userId) {
-        return getSuccessResponseVO(videoInfoClient.loadVideoSeries(userId));
+        return getSuccessResponseVO(uHomeService.loadVideoSeries(userId));
     }
 
     @RequestMapping("/loadUserCollection")
     public ResponseVO loadUserCollection(@RequestParam(value = "pageNo", required = false) Integer pageNo,
                                          @RequestParam(value = "userId") String userId) {
-        return getSuccessResponseVO(videoInfoClient.loadUserCollection(pageNo, userId));
+        return getSuccessResponseVO(uHomeService.loadUserCollection(pageNo, userId));
     }
     @RequestMapping("/loadFocusList")
     public ResponseVO loadFocusList(Integer pageNo, Integer pageSize) {

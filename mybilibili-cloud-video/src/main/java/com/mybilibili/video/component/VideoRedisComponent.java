@@ -12,6 +12,7 @@ import com.mybilibili.common.redis.RedisUtils;
 import com.mybilibili.video.constants.VideoRedisKeys;
 import com.mybilibili.video.entity.po.VideoInfoFilePost;
 import jakarta.annotation.Resource;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
 
@@ -34,6 +35,8 @@ public class VideoRedisComponent {
 
     @Resource
     private RedisUtils redisUtils;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
     @Resource
     private AdminSysSettingClient adminSysSettingClient;
 
@@ -186,7 +189,11 @@ public class VideoRedisComponent {
     }
 
     public void addAiSubtitleIndexTask(AiSubtitleIndexTaskDTO task) {
-        redisUtils.lpush(VideoRedisKeys.AI_SUBTITLE_INDEX_QUEUE, task, 0L);
+        if (task == null) {
+            return;
+        }
+        // Python worker 使用 json.loads 消费队列，这里必须写入原始 JSON 字符串，不能走 RedisTemplate JSON 序列化。
+        stringRedisTemplate.opsForList().leftPush(VideoRedisKeys.AI_SUBTITLE_INDEX_QUEUE, JSON.toJSONString(task));
     }
 
     public Long incrementUserStats(String userId, String field, long count) {
@@ -273,3 +280,4 @@ public class VideoRedisComponent {
         return (VideoHistoryDeleteDTO) redisUtils.rpop(VideoRedisKeys.VIDEO_HISTORY_DELETE_QUEUE);
     }
 }
+

@@ -100,4 +100,7 @@ public interface VideoInfoClient {
     @GetMapping(Constants.INNER_API_PREFIX + "/ucenter/loadAllVideo")
     List<VideoInfoDTO> loadAllVideo(@RequestParam("userId") String userId);
 
+    @GetMapping(Constants.INNER_API_PREFIX + "/ucenter/getVideoListByIds")
+    List<VideoInfoDTO> getVideoListByIds(@RequestParam("videoIds") List<String> videoIds, @RequestParam("userId") String userId);
+
 }

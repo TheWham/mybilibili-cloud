@@ -5,12 +5,13 @@ import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.UserActionSyncDTO;
 import com.mybilibili.base.entity.query.UserActionQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
+import com.mybilibili.base.entity.vo.UserActionVO;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.enums.UserActionTypeEnum;
-import com.mybilibili.common.controller.ABaseController;
 import com.mybilibili.interact.entity.po.UserVideoAction;
 import com.mybilibili.interact.services.UserVideoActionService;
 import jakarta.annotation.Resource;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,7 +21,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping(Constants.INNER_API_PREFIX)
-public class UserVideoActionApi extends ABaseController {
+public class UserVideoActionApi {
 
     @Resource
     private UserVideoActionService userVideoActionService;
@@ -53,6 +54,11 @@ public class UserVideoActionApi extends ABaseController {
         List<UserActionSyncDTO> userActionSyncDTOS = BeanUtil.copyToList(userCollectionVideoList, UserActionSyncDTO.class);
         userCollectionVideoSyncPage.setList(userActionSyncDTOS);
         return userCollectionVideoSyncPage;
+    }
+
+    @RequestMapping("/getUserActionList")
+    public List<UserActionVO> getUserActionTypeList(@RequestBody UserActionQuery actionQuery) {
+       return userVideoActionService.getUserActionTypeList(actionQuery);
     }
 
 }

@@ -15,6 +15,7 @@ public class VideoDanmu implements Serializable {
 
     private Integer danmuId;
     private String videoId;
+    private String videoUserId;
     private String fileId;
     private String userId;
 
@@ -43,6 +44,14 @@ public class VideoDanmu implements Serializable {
 
     public void setVideoId(String videoId) {
         this.videoId = videoId;
+    }
+
+    public String getVideoUserId() {
+        return videoUserId;
+    }
+
+    public void setVideoUserId(String videoUserId) {
+        this.videoUserId = videoUserId;
     }
 
     public String getFileId() {
@@ -122,6 +131,7 @@ public class VideoDanmu implements Serializable {
         return "VideoDanmu{"
                 + "danmuId='" + danmuId
                 + ", videoId='" + videoId + '\''
+                + ", videoUserId='" + videoUserId + '\''
                 + ", fileId='" + fileId + '\''
                 + ", userId='" + userId + '\''
                 + ", postTime='" + DateUtils.format(postTime, DateTimePatternEnum.YYYY_MM_DD_HH_MM_SS.getPattern()) + '\''

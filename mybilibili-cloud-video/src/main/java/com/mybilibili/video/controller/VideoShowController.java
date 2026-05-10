@@ -2,16 +2,13 @@ package com.mybilibili.video.controller;
 
 
 import com.mybilibili.base.constants.Constants;
-import com.mybilibili.base.entity.query.UserActionQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.entity.vo.ResponseVO;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.enums.ResponseCodeEnum;
-import com.mybilibili.base.enums.UserActionTypeEnum;
 import com.mybilibili.base.enums.VideoRecommendEnum;
 import com.mybilibili.base.exception.BusinessException;
 import com.mybilibili.common.controller.ABaseController;
-import com.mybilibili.video.component.VideoRedisComponent;
 import com.mybilibili.video.entity.enums.SearchOrderTypeEnum;
 import com.mybilibili.video.entity.po.VideoInfo;
 import com.mybilibili.video.entity.po.VideoInfoFile;
@@ -38,13 +35,8 @@ public class VideoShowController extends ABaseController {
 
     @Resource
     private VideoInfoFileService videoInfoFileService;
-////TODO
-//    @Resource
-//    private UserVideoActionService userVideoActionService;
     @Resource
     private VideoEsService videoEsService;
-    @Resource
-    private VideoRedisComponent redisComponent;
 
     @RequestMapping("/loadVideo")
     public ResponseVO loadVideo(Integer pageNo, Integer pCategoryId, Integer categoryId)
@@ -71,19 +63,8 @@ public class VideoShowController extends ABaseController {
 
     @RequestMapping("/getVideoInfo")
     public ResponseVO getVideoInfo(@NotEmpty String videoId){
-        VideoInfo videoInfo = videoInfoService.getVideoInfoByVideoId(videoId);
-        if (videoInfo == null)
-            throw new BusinessException(ResponseCodeEnum.CODE_404);
-        VideoInfoResultVO videoInfoResultVO = new VideoInfoResultVO(videoInfo);
-        //查询是否投币,点赞,收藏
-        String userId = getTokenUserInfo().getUserId();
-        UserActionQuery actionQuery = new UserActionQuery();
-        actionQuery.setUserId(userId);
-        actionQuery.setVideoId(videoId);
-        actionQuery.setUserActionTypeList(new Integer[]{UserActionTypeEnum.VIDEO_LIKE.getType(), UserActionTypeEnum.VIDEO_COIN.getType(), UserActionTypeEnum.VIDEO_COLLECT.getType()});
-       //TODO调用interact feign
-//        List<UserActionVO> userActionTypeList = userVideoActionService.getUserActionTypeList(actionQuery);
-//        videoInfoResultVO.setUserActionList(userActionTypeList);
+
+        VideoInfoResultVO videoInfoResultVO = videoInfoService.getVideoInfoResultVO(videoId, getTokenUserInfo().getUserId());
         return getSuccessResponseVO(videoInfoResultVO);
     }
 

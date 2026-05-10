@@ -4,6 +4,9 @@ import cn.hutool.core.bean.BeanUtil;
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.AiSubtitleIndexTaskDTO;
 import com.mybilibili.base.entity.dto.SysSettingDTO;
+import com.mybilibili.base.entity.query.UserActionQuery;
+import com.mybilibili.base.entity.vo.UserActionVO;
+import com.mybilibili.video.consumer.UserVideoActionClient;
 import com.mybilibili.video.entity.po.VideoInfo;
 import com.mybilibili.video.entity.po.VideoInfoFile;
 import com.mybilibili.video.entity.po.VideoInfoFilePost;
@@ -25,6 +28,7 @@ import com.mybilibili.video.entity.query.VideoInfoFilePostQuery;
 import com.mybilibili.video.entity.query.VideoInfoFileQuery;
 import com.mybilibili.video.entity.query.VideoInfoPostQuery;
 import com.mybilibili.video.entity.query.VideoInfoQuery;
+import com.mybilibili.video.entity.vo.VideoInfoResultVO;
 import com.mybilibili.video.mappers.VideoInfoFileMapper;
 import com.mybilibili.video.mappers.VideoInfoFilePostMapper;
 import com.mybilibili.video.mappers.VideoInfoMapper;
@@ -71,6 +75,9 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 	private VideoEsService videoEsService;
 	@Resource
 	private AiSubtitleVectorService aiSubtitleVectorService;
+
+	@Resource
+	private UserVideoActionClient userVideoActionClient;
 
 	/**
 	 * @description 根据条件查询
@@ -279,6 +286,24 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 			updateInfo.setRecommendType(VideoRecommendEnum.NO_RECOMMEND.getStatus());
 
 		this.videoInfoMapper.updateByVideoId(updateInfo, videoId);
+	}
+
+	@Override
+	public VideoInfoResultVO getVideoInfoResultVO(String videoId, String userId) {
+
+		VideoInfo videoInfo = videoInfoMapper.selectByVideoId(videoId);
+		if (videoInfo == null)
+			throw new BusinessException(ResponseCodeEnum.CODE_404);
+		VideoInfoResultVO videoInfoResultVO = new VideoInfoResultVO(videoInfo);
+		//查询是否投币,点赞,收藏
+		UserActionQuery actionQuery = new UserActionQuery();
+		actionQuery.setUserId(userId);
+		actionQuery.setVideoId(videoId);
+		actionQuery.setUserActionTypeList(new Integer[]{UserActionTypeEnum.VIDEO_LIKE.getType(), UserActionTypeEnum.VIDEO_COIN.getType(), UserActionTypeEnum.VIDEO_COLLECT.getType()});
+		//调用interact feign
+		List<UserActionVO> userActionTypeList = userVideoActionClient.getUserActionTypeList(actionQuery);
+		videoInfoResultVO.setUserActionList(userActionTypeList);
+		return videoInfoResultVO;
 	}
 
 	/**

@@ -30,7 +30,7 @@ spring:
         - id: mybilibili-cloud-user
           uri: lb://mybilibili-cloud-user
           predicates:
-            - Path=/web/userInfo/**,/web/uhome/**,/web/uHome/**,/web/user/**,/web/sysSetting/**
+            - Path=/web/userInfo/**,/web/uhome/**,/web/uHome/**,/web/user/**,/web/sysSetting/**,/web/ucenter/**
           filters:
             - StripPrefix=1
 
@@ -46,7 +46,7 @@ spring:
         - id: mybilibili-cloud-interact
           uri: lb://mybilibili-cloud-interact
           predicates:
-            - Path=/web/interact/**,/web/action/**,/web/userAction/**,/web/comment/**,/web/danmu/**,/web/ucenter/**
+            - Path=/web/interact/**,/web/action/**,/web/userAction/**,/web/comment/**,/web/danmu/**
           filters:
             - StripPrefix=1
 

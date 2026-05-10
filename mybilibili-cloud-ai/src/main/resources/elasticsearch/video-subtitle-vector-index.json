@@ -1,0 +1,56 @@
+{
+  "mappings": {
+    "properties": {
+      "videoId": {
+        "type": "keyword"
+      },
+      "fileId": {
+        "type": "keyword"
+      },
+      "userId": {
+        "type": "keyword"
+      },
+      "fileIndex": {
+        "type": "integer"
+      },
+      "segmentIndex": {
+        "type": "integer"
+      },
+      "videoName": {
+        "type": "text",
+        "analyzer": "ik_max_word"
+      },
+      "tags": {
+        "type": "text",
+        "analyzer": "ik_max_word"
+      },
+      "content": {
+        "type": "text",
+        "analyzer": "ik_max_word"
+      },
+      "videoCover": {
+        "type": "keyword",
+        "index": false
+      },
+      "startTime": {
+        "type": "float"
+      },
+      "endTime": {
+        "type": "float"
+      },
+      "contentVector": {
+        "type": "dense_vector",
+        "dims": 1024,
+        "index": true,
+        "similarity": "cosine"
+      },
+      "embeddingModel": {
+        "type": "keyword"
+      },
+      "createTime": {
+        "type": "date",
+        "format": "yyyy-MM-dd HH:mm:ss"
+      }
+    }
+  }
+}

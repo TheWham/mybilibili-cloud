@@ -139,6 +139,11 @@ public class Constants {
     public static final String REDIS_KEY_VIDEO_SEARCH_COUNT = REDIS_PREFIX + "video:search:";
 
     /**
+     * AI 字幕向量化任务队列，video 生产，Python worker 消费。
+     */
+    public static final String REDIS_AI_SUBTITLE_VECTOR_QUEUE_KEY = REDIS_PREFIX + "queue:ai:subtitle-vector";
+
+    /**
      * Redis Lua 脚本资源路径。
      */
     public static final String REDIS_LUA_VIDEO_COIN = "lua/video_coin.lua";
@@ -160,3 +165,4 @@ public class Constants {
     public static final String CLOUD_SEARCH_NAME = "mybilibili-cloud-search";
     public static final String CLOUD_AI_NAME = "mybilibili-cloud-ai";
 }
+

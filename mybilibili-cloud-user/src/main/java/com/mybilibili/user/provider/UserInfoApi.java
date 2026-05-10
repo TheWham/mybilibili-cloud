@@ -8,6 +8,7 @@ import com.mybilibili.base.entity.query.UserInfoQuery;
 import com.mybilibili.user.entity.po.UserInfo;
 import com.mybilibili.user.services.UserInfoService;
 import jakarta.annotation.Resource;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,4 +34,15 @@ public class UserInfoApi {
         List<UserInfo> userInfoList = userInfoService.findListByParam(userInfoQuery);
         return BeanUtil.copyToList(userInfoList, UserInfoDTO.class);
     }
+
+    @RequestMapping("/message/selecUserInfoList")
+    public List<UserInfoDTO> selecUserInfoList(@RequestBody UserInfoQuery userInfoQuery)
+    {
+        List<UserInfo> userInfoList = userInfoService.findListByParam(userInfoQuery);
+        List<UserInfoDTO> userInfoDTOS = BeanUtil.copyToList(userInfoList, UserInfoDTO.class);
+        return userInfoDTOS;
+    }
+
+
 }
+

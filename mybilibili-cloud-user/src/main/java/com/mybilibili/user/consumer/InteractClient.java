@@ -3,7 +3,7 @@ package com.mybilibili.user.consumer;
 
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
-import com.mybilibili.base.entity.vo.VideoCommentVO;
+import com.mybilibili.base.entity.vo.VideoCommentInUCenterVO;
 import com.mybilibili.base.entity.vo.VideoDanmuVO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,7 +13,16 @@ import org.springframework.web.bind.annotation.RequestParam;
 public interface InteractClient {
 
     @GetMapping(Constants.INNER_API_PREFIX + "/loadComment")
-    PaginationResultVO<VideoCommentVO> loadComment(
+    PaginationResultVO<VideoCommentInUCenterVO> loadComment(
+            @RequestParam(value = "pageNo", required = false) Integer pageNo,
+            @RequestParam(value = "pageSize", required = false) Integer pageSize,
+            @RequestParam(value = "videoId", required = false) String videoId,
+            @RequestParam("userId") String userId
+    );
+
+
+    @GetMapping(Constants.INNER_API_PREFIX + "/loadCommentInUCenter")
+    PaginationResultVO<VideoCommentInUCenterVO> loadCommentInUCenter(
             @RequestParam(value = "pageNo", required = false) Integer pageNo,
             @RequestParam(value = "pageSize", required = false) Integer pageSize,
             @RequestParam(value = "videoId", required = false) String videoId,

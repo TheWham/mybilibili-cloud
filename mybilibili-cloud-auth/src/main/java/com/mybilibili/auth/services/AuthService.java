@@ -4,6 +4,7 @@ package com.mybilibili.auth.services;
 import com.mybilibili.base.entity.dto.RegisterDTO;
 import com.mybilibili.base.entity.dto.WebLoginDTO;
 import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
+import com.mybilibili.base.entity.vo.UserCountVO;
 
 import java.util.Map;
 
@@ -30,6 +31,21 @@ public interface AuthService {
 	 */
 	TokenUserInfoDTO login(WebLoginDTO webLoginDTO);
 
+	/**
+	 * 自动登录时刷新登录态和用户实时统计缓存。
+	 *
+	 * @param tokenUserInfo 当前请求携带的登录用户信息
+	 * @return 可继续登录时返回更新后的用户信息，否则返回 null
+	 */
+	TokenUserInfoDTO autoLogin(TokenUserInfoDTO tokenUserInfo);
+
+	/**
+	 * 查询用户侧统计数据。
+	 *
+	 * @param userId 当前登录用户 ID
+	 * @return 用户统计信息
+	 */
+	UserCountVO getUserCountInfo(String userId);
 
 	/**
 	 * 生成验证码

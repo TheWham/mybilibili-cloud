@@ -86,4 +86,9 @@ public interface CategoryInfoService {
 	void saveCategory(CategoryInfo categoryInfo);
 
 	void changeSort(Integer pCategoryId, List<Integer> categoryIds);
+
+	/**
+	 * 从 admin 服务读取前台可用的分类数据。
+	 */
+	List<CategoryInfo> loadAllCategoryFromAdmin();
 }

@@ -11,7 +11,7 @@ import java.util.Date;
  *
  * <p>跨服务返回时不直接暴露 interact 的评论 PO，避免 user 服务依赖评论表结构。</p>
  */
-public class VideoCommentVO {
+public class VideoCommentInUCenterVO {
 
     private Integer commentId;
 

@@ -25,8 +25,9 @@ public final class VideoRedisKeys {
     public static final String DEL_FILE_QUEUE = Constants.REDIS_PREFIX + "queue:del:file:list:";
     public static final String TRANSFER_FILE_QUEUE = Constants.REDIS_PREFIX + "queue:transfer:file:list:";
     public static final String VIDEO_AUDIT_REWARD_QUEUE = Constants.REDIS_PREFIX + "queue:action:video:audit:reward:list:";
-    public static final String AI_SUBTITLE_INDEX_QUEUE = Constants.REDIS_PREFIX + "queue:ai:subtitle:index:list:";
+    public static final String AI_SUBTITLE_INDEX_QUEUE = Constants.REDIS_AI_SUBTITLE_VECTOR_QUEUE_KEY;
     public static final String UPLOADING_FILE_INFO_KEY = Constants.REDIS_PREFIX + "uploadFileInfo:";
     public static final String SYS_SETTING_KEY = Constants.REDIS_PREFIX + "sysSetting:";
     public static final String USER_STATS_KEY = Constants.REDIS_PREFIX + "web:userInfo:stats:";
 }
+

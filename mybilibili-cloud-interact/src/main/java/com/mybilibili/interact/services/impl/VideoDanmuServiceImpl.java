@@ -1,11 +1,13 @@
 package com.mybilibili.interact.services.impl;
 
 import com.mybilibili.base.entity.query.SimplePage;
+import com.mybilibili.base.entity.dto.VideoInfoDTO;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.enums.ResponseCodeEnum;
 import com.mybilibili.base.exception.BusinessException;
 import com.mybilibili.common.component.UserDailyLimitComponent;
+import com.mybilibili.interact.consumer.VideoInfoClient;
 import com.mybilibili.interact.entity.po.VideoDanmu;
 import com.mybilibili.interact.entity.query.VideoDanmuQuery;
 import com.mybilibili.interact.mappers.VideoDanmuMapper;
@@ -28,6 +30,9 @@ public class VideoDanmuServiceImpl implements VideoDanmuService {
 
     @Resource
     private UserDailyLimitComponent userDailyLimitComponent;
+
+    @Resource
+    private VideoInfoClient videoInfoClient;
 
     @Override
     public List<VideoDanmu> findListByParam(VideoDanmuQuery param) {
@@ -97,7 +102,11 @@ public class VideoDanmuServiceImpl implements VideoDanmuService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void postDanmu(VideoDanmu videoDanmu) {
-        // TODO 后续改为调用 video 服务内部接口校验视频是否存在、弹幕是否开启。
+        VideoInfoDTO videoInfo = Optional.ofNullable(videoInfoClient.getVideoInfoByVideoId(videoDanmu.getVideoId()))
+                .orElseThrow(() -> new BusinessException(ResponseCodeEnum.CODE_600));
+        // 视频作者必须以后端查询结果为准，前端传归属字段会带来伪造风险。
+        videoDanmu.setVideoUserId(videoInfo.getUserId());
+        // TODO 后续改为调用 video 服务内部接口校验弹幕是否开启。
         // TODO 后续通过 video/search 服务或消息队列更新视频弹幕数和 ES 计数字段。
         add(videoDanmu);
         // TODO 后续接入日限额成功链路后，保留“写入成功再记录”的顺序。

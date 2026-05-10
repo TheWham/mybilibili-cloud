@@ -7,6 +7,7 @@ import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.exception.BusinessException;
+import com.mybilibili.video.consumer.CategoryClient;
 import com.mybilibili.video.mappers.CategoryInfoMapper;
 import com.mybilibili.video.services.CategoryInfoService;
 import jakarta.annotation.Resource;
@@ -28,6 +29,9 @@ Service
 public class CategoryInfoServiceImpl implements CategoryInfoService {
 	@Resource
 	private CategoryInfoMapper<CategoryInfo, CategoryInfoQuery> categoryInfoMapper;
+
+	@Resource
+	private CategoryClient categoryClient;
 
 	/**
 	 * @description 根据条件查询
@@ -202,6 +206,11 @@ public class CategoryInfoServiceImpl implements CategoryInfoService {
 			updateCategoryList.add(categoryInfo);
 		}
 		this.categoryInfoMapper.updateSortBatch(updateCategoryList);
+	}
+
+	@Override
+	public List<CategoryInfo> loadAllCategoryFromAdmin() {
+		return categoryClient.loadAllCategory();
 	}
 
 }

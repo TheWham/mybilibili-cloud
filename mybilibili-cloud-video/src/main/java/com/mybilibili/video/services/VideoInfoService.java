@@ -1,10 +1,11 @@
 package com.mybilibili.video.services;
 
-import com.mybilibili.video.entity.po.VideoInfo;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.video.entity.dto.VideoCountDTO;
 import com.mybilibili.video.entity.dto.VideoCountUpdateDTO;
+import com.mybilibili.video.entity.po.VideoInfo;
 import com.mybilibili.video.entity.query.VideoInfoQuery;
+import com.mybilibili.video.entity.vo.VideoInfoResultVO;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -85,4 +86,6 @@ public interface VideoInfoService {
 	Integer updateCountBatch(@Param("field") String field, @Param("list") List<VideoCountUpdateDTO> list);
 
 	void recommendVideo(String videoId);
+
+    VideoInfoResultVO getVideoInfoResultVO(String videoId, String userId);
 }

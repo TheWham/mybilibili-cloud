@@ -1,6 +1,7 @@
 package com.mybilibili.interact.consumer;
 
 import com.mybilibili.base.constants.Constants;
+import com.mybilibili.base.entity.dto.VideoInfoDTO;
 import com.mybilibili.base.entity.vo.UserCollectionVO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +26,15 @@ public interface VideoInfoClient {
      */
     @GetMapping(Constants.INNER_API_PREFIX + "/collection/loadVideoInfo")
     List<UserCollectionVO> loadCollectionVideoInfo(@RequestParam("videoIds") List<String> videoIds);
+
+    /**
+     * 根据视频 id 查询视频基础信息。
+     *
+     * @param videoId 视频 id
+     * @return 视频基础信息，包含视频作者 userId
+     */
+    @GetMapping(Constants.INNER_API_PREFIX + "/getVideoInfoByVideoId")
+    VideoInfoDTO getVideoInfoByVideoId(@RequestParam("videoId") String videoId);
 
     /**
      * 根据视频 id 查询视频信息。

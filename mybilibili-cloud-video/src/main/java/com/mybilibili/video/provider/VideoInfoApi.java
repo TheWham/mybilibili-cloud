@@ -227,6 +227,32 @@ public class VideoInfoApi{
         videoInfoPostService.saveVideoInteraction(videoInfoPost);
     }
 
+    @RequestMapping("/ucenter/getVideoListByIds")
+    public List<VideoInfoDTO> getVideoListByIds(@RequestParam("videoIds") List<String> videoIds, @RequestParam(value = "userId") String userId)
+    {
+        String[] arrayIds = videoIds.toArray(String[]::new);
+        VideoInfoQuery videoInfoQuery = new VideoInfoQuery();
+        videoInfoQuery.setUserId(userId);
+        videoInfoQuery.setArrayIds(arrayIds);
+        List<VideoInfo> videoInfos = videoInfoService.findListByParam(videoInfoQuery);
+        List<VideoInfoDTO> videoInfoDTOS = BeanUtil.copyToList(videoInfos, VideoInfoDTO.class);
+        return videoInfoDTOS;
+    }
+
+    @RequestMapping("/message/selectVideoInfoByIds")
+    public List<VideoInfoDTO> selectVideoInfoByIds(@RequestParam("videoIds") List<String> videoIds)
+    {
+        if (videoIds == null || videoIds.isEmpty())
+            return Collections.emptyList();
+
+        String[] arrayIds = videoIds.toArray(String[]::new);
+        VideoInfoQuery videoInfoQuery = new VideoInfoQuery();
+        videoInfoQuery.setArrayIds(arrayIds);
+        List<VideoInfo> videoInfos = videoInfoService.findListByParam(videoInfoQuery);
+        List<VideoInfoDTO> videoInfoDTOS = BeanUtil.copyToList(videoInfos, VideoInfoDTO.class);
+        return videoInfoDTOS;
+    }
+
     /**
      * 查询当前用户的全部公开视频，用于用户中心下拉选择等轻量场景。
      */
@@ -247,6 +273,21 @@ public class VideoInfoApi{
             return Collections.emptyList();
         }
         return BeanUtil.copyToList(videoInfoList, UserCollectionVO.class);
+    }
+
+    /**
+     * 根据视频 id 查询视频基础信息。
+     *
+     * <p>给 interact 等内部服务补齐视频作者、标题等归属信息使用。这里统一在 video 服务查，
+     * 避免调用方直接依赖 video 表结构。</p>
+     */
+    @RequestMapping("/getVideoInfoByVideoId")
+    public VideoInfoDTO getVideoInfoByVideoId(@RequestParam("videoId") String videoId) {
+        VideoInfo videoInfo = videoInfoService.getVideoInfoByVideoId(videoId);
+        if (videoInfo == null) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600);
+        }
+        return BeanUtil.toBean(videoInfo, VideoInfoDTO.class);
     }
 
     /**
@@ -278,6 +319,7 @@ public class VideoInfoApi{
         String filePath = filePostByFileId.getFilePath();
         return filePath;
     }
+
 
     private UserVideoSeriesVO toSeriesVO(UserVideoSeriesDTO userVideoSeriesDTO)
     {

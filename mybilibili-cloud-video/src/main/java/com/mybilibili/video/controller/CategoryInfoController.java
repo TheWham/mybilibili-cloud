@@ -10,7 +10,6 @@ import com.mybilibili.base.entity.vo.ResponseVO;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.common.controller.ABaseController;
 import com.mybilibili.video.component.VideoRedisComponent;
-import com.mybilibili.video.consumer.CategoryClient;
 import com.mybilibili.video.services.CategoryInfoService;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotNull;
@@ -36,9 +35,6 @@ Service
 @Validated
 public class CategoryInfoController extends ABaseController {
 	private static final Logger log = LoggerFactory.getLogger(CategoryInfoController.class);
-
-	@Resource
-	private CategoryClient categoryClient;
 
 	@Resource
 	private CategoryInfoService categoryService;
@@ -108,7 +104,7 @@ public class CategoryInfoController extends ABaseController {
 	@RequestMapping("/loadAllCategory")
 	public ResponseVO loadAllCategory()
 	{
-		return getSuccessResponseVO(categoryClient.loadAllCategory());
+		return getSuccessResponseVO(categoryService.loadAllCategoryFromAdmin());
 	}
 
 	@RequestMapping("/saveCategory")
