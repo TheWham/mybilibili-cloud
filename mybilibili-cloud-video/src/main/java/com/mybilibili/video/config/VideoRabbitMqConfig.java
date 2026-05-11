@@ -39,6 +39,23 @@ public class VideoRabbitMqConfig {
     }
 
     @Bean
+    public DirectExchange userActionExchange() {
+        return new DirectExchange(MqConstants.USER_ACTION_EXCHANGE, true, false);
+    }
+
+    @Bean
+    public Queue videoActionCountQueue() {
+        return new Queue(MqConstants.VIDEO_ACTION_COUNT_QUEUE, true);
+    }
+
+    @Bean
+    public Binding videoActionCountBinding(DirectExchange userActionExchange, Queue videoActionCountQueue) {
+        return BindingBuilder.bind(videoActionCountQueue)
+                .to(userActionExchange)
+                .with(MqConstants.VIDEO_ACTION_COUNT_ROUTING_KEY);
+    }
+
+    @Bean
     public MessageConverter messageConverter() {
         return new Jackson2JsonMessageConverter();
     }

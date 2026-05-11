@@ -28,4 +28,39 @@ public final class MqConstants {
      * 视频播放事件路由键。
      */
     public static final String VIDEO_PLAY_ROUTING_KEY = "video.play.report";
+
+    /**
+     * 用户互动事件交换机。
+     */
+    public static final String USER_ACTION_EXCHANGE = "mybilibili.user.action.exchange";
+
+    /**
+     * 用户视频行为落库队列，由 interact 服务消费。
+     */
+    public static final String USER_ACTION_PERSIST_QUEUE = "mybilibili.user.action.persist.queue";
+
+    /**
+     * 用户视频行为落库路由键。
+     */
+    public static final String USER_ACTION_PERSIST_ROUTING_KEY = "user.action.persist";
+
+    /**
+     * 视频互动计数队列，由 video 服务消费。
+     */
+    public static final String VIDEO_ACTION_COUNT_QUEUE = "mybilibili.video.action.count.queue";
+
+    /**
+     * 视频互动计数路由键。
+     */
+    public static final String VIDEO_ACTION_COUNT_ROUTING_KEY = "video.action.count";
+
+    /**
+     * 用户硬币计数队列，由 user 服务消费。
+     */
+    public static final String USER_COIN_SYNC_QUEUE = "mybilibili.user.coin.sync.queue";
+
+    /**
+     * 用户硬币计数路由键。
+     */
+    public static final String USER_COIN_SYNC_ROUTING_KEY = "user.coin.sync";
 }

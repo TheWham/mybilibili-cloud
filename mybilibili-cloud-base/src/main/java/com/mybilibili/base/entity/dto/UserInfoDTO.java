@@ -7,4 +7,5 @@ public class UserInfoDTO {
     private String nickName;
     private String avatar;
     private String userId;
+    private Integer currentCoinCount;
 }

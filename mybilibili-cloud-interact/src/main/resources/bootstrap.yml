@@ -15,3 +15,6 @@ spring:
           - data-id: seata-common-dev.yml
             group: DEFAULT_GROUP
             refresh: true
+          - data-id: shared-mq-dev.yml
+            group: DEFAULT_GROUP
+            refresh: true

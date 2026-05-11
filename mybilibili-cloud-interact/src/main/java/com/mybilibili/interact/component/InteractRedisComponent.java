@@ -118,6 +118,19 @@ public class InteractRedisComponent {
         return value;
     }
 
+    public Integer getUserStatsValue(String userId, String field) {
+        Object value = redisUtils.hget(InteractRedisKeys.USER_STATS_KEY + userId, field);
+        return value == null ? null : Integer.parseInt(value.toString());
+    }
+
+    public void setUserStatsValue(String userId, String field, Integer value) {
+        Map<String, Object> statsMap = new HashMap<>(1);
+        statsMap.put(field, value);
+        redisUtils.hmset(InteractRedisKeys.USER_STATS_KEY + userId,
+                statsMap,
+                (long) Constants.REDIS_EXPIRE_TIME_ONE_DAY * Constants.REDIS_USER_STATS_CACHE_TTL_DAYS);
+    }
+
     public Long addVideoActionCountDelta(String videoId, String field, long delta) {
         String key = InteractRedisKeys.VIDEO_ACTION_COUNT_DELTA + videoId;
         Long value = redisUtils.hincr(key, field, delta);

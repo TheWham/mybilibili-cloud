@@ -2,20 +2,25 @@ package com.mybilibili.video.component;
 
 import com.alibaba.fastjson2.JSON;
 import com.mybilibili.base.constants.Constants;
+import com.mybilibili.base.constants.MqConstants;
 import com.mybilibili.base.entity.dto.AiSubtitleIndexTaskDTO;
 import com.mybilibili.base.entity.dto.SysSettingDTO;
 import com.mybilibili.base.entity.dto.UploadingFileDTO;
 import com.mybilibili.base.entity.dto.VideoHistoryDeleteDTO;
+import com.mybilibili.base.entity.event.UserCoinSyncEvent;
+import com.mybilibili.base.enums.UserStatsRedisEnum;
 import com.mybilibili.common.consumer.AdminSysSettingClient;
 import com.mybilibili.video.entity.po.CategoryInfo;
 import com.mybilibili.common.redis.RedisUtils;
 import com.mybilibili.video.constants.VideoRedisKeys;
 import com.mybilibili.video.entity.po.VideoInfoFilePost;
 import jakarta.annotation.Resource;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
 
+import java.util.Date;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -24,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * video 服务缓存组件。
@@ -39,6 +45,8 @@ public class VideoRedisComponent {
     private StringRedisTemplate stringRedisTemplate;
     @Resource
     private AdminSysSettingClient adminSysSettingClient;
+    @Resource
+    private RabbitTemplate rabbitTemplate;
 
     public void saveCategoryList2Redis(List<CategoryInfo> categoryList) {
         redisUtils.set(VideoRedisKeys.CATEGORY_KEY, categoryList);
@@ -131,6 +139,13 @@ public class VideoRedisComponent {
         return resultMap;
     }
 
+    public Long addVideoActionCountDelta(String videoId, String field, long delta) {
+        String key = VideoRedisKeys.VIDEO_ACTION_COUNT_DELTA + videoId;
+        Long value = redisUtils.hincr(key, field, delta);
+        redisUtils.expire(key, Constants.REDIS_EXPIRE_TIME_TWO_DAY);
+        return value;
+    }
+
     public SysSettingDTO getSysSetting() {
         Object sysSetting = redisUtils.get(VideoRedisKeys.SYS_SETTING_KEY);
         if (sysSetting instanceof SysSettingDTO dto) {
@@ -155,11 +170,22 @@ public class VideoRedisComponent {
     }
 
     public void addVideoAuditReward(String userId, String videoId, Integer rewardCoinCount) {
-        Map<String, Object> rewardMap = new HashMap<>(3);
-        rewardMap.put("userId", userId);
-        rewardMap.put("videoId", videoId);
-        rewardMap.put("rewardCoinCount", rewardCoinCount);
-        redisUtils.lpush(VideoRedisKeys.VIDEO_AUDIT_REWARD_QUEUE, rewardMap, 0L);
+        if (userId == null || rewardCoinCount == null || rewardCoinCount <= 0) {
+            return;
+        }
+        // 审核奖励要先写 Redis 实时统计，用户刷新个人中心时能马上看到硬币变化。
+        incrementUserStats(userId, UserStatsRedisEnum.USER_COIN.getField(), rewardCoinCount);
+
+        UserCoinSyncEvent rewardEvent = new UserCoinSyncEvent();
+        rewardEvent.setEventId(UUID.randomUUID().toString().replace("-", ""));
+        rewardEvent.setVideoUserId(userId);
+        rewardEvent.setVideoId(videoId);
+        rewardEvent.setActionCount(rewardCoinCount);
+        rewardEvent.setAuditReward(true);
+        rewardEvent.setActionTime(new Date());
+        rabbitTemplate.convertAndSend(MqConstants.USER_ACTION_EXCHANGE,
+                MqConstants.USER_COIN_SYNC_ROUTING_KEY,
+                rewardEvent);
     }
 
     public void addFileList2DelQueue(String videoId, List<String> filePathList) {
