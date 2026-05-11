@@ -598,7 +598,7 @@
 		from video_info v where v.video_id=#{videoId}
 	</select>
 
-    <select id="sumVideoCountByUserId" resultType="com.mybilibili.video.entity.dto.VideoCountDTO">
+    <select id="sumVideoCountByUserId" resultType="com.mybilibili.base.entity.dto.VideoCountDTO">
 		SELECT
 		    IFNULL(SUM(like_count), 0) AS totalLikeCount,
 		    IFNULL(SUM(play_count), 0) AS totalPlayCount

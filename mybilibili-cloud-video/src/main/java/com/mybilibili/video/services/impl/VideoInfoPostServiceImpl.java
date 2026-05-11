@@ -314,7 +314,8 @@ public class VideoInfoPostServiceImpl implements VideoInfoPostService {
 		//更新infoPost, info
 		VideoInfoPostQuery videoInfoPostQuery = new VideoInfoPostQuery();
 		videoInfoPostQuery.setVideoId(videoInfoPost.getVideoId());
-		videoInfoPostQuery.setUserId(videoInfoPostQuery.getUserId());
+		// provider 已经校验过归属，这里仍带上 userId，避免后续复用该方法时放宽更新范围。
+		videoInfoPostQuery.setUserId(videoInfoPost.getUserId());
 		videoInfoPostMapper.updateByCondition(videoInfoPost, videoInfoPostQuery);
 
 		VideoInfoQuery videoInfoQuery = new VideoInfoQuery();

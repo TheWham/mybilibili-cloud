@@ -16,6 +16,7 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -91,8 +92,9 @@ public class VideoDanmuServiceImpl implements VideoDanmuService {
         VideoDanmu danmu = Optional.ofNullable(videoDanmuMapper.selectByDanmuId(danmuId))
                 .orElseThrow(() -> new BusinessException(ResponseCodeEnum.CODE_600));
 
-        // TODO 后续调用 video 服务查询 UP 主信息后，补回“UP 主可删除自己视频下弹幕”的权限。
-        boolean canDirectDelete = Boolean.TRUE.equals(isAdmin) || danmu.getUserId().equals(userId);
+        boolean canDirectDelete = Boolean.TRUE.equals(isAdmin)
+                || danmu.getUserId().equals(userId)
+                || isVideoOwner(danmu.getVideoId(), userId);
         if (!canDirectDelete) {
             throw new BusinessException(ResponseCodeEnum.CODE_600);
         }
@@ -106,19 +108,37 @@ public class VideoDanmuServiceImpl implements VideoDanmuService {
                 .orElseThrow(() -> new BusinessException(ResponseCodeEnum.CODE_600));
         // 视频作者必须以后端查询结果为准，前端传归属字段会带来伪造风险。
         videoDanmu.setVideoUserId(videoInfo.getUserId());
-        // TODO 后续改为调用 video 服务内部接口校验弹幕是否开启。
-        // TODO 后续通过 video/search 服务或消息队列更新视频弹幕数和 ES 计数字段。
+        if (!checkDanmuOpen(videoDanmu.getVideoId())) {
+            throw new BusinessException("弹幕功能已关闭");
+        }
         add(videoDanmu);
+        // TODO 后续通过 video/search 服务或消息队列更新视频弹幕数和 ES 计数字段。
         // TODO 后续接入日限额成功链路后，保留“写入成功再记录”的顺序。
         // userDailyLimitComponent.recordDailyAction(videoDanmu.getUserId(), UserDailyLimitTypeEnum.DANMU);
     }
 
     @Override
     public List<VideoDanmu> loadDanmu(String fileId, String videoId) {
-        // TODO 后续改为调用 video 服务内部接口校验弹幕开关；当前只按本地弹幕表加载。
+        if (!checkDanmuOpen(videoId)) {
+            return Collections.emptyList();
+        }
         VideoDanmuQuery danmuQuery = new VideoDanmuQuery();
         danmuQuery.setFileId(fileId);
         danmuQuery.setVideoId(videoId);
         return findListByParam(danmuQuery);
+    }
+
+    private boolean checkDanmuOpen(String videoId) {
+        Boolean danmuOpen = videoInfoClient.checkVideoDanmuStatusByVideoId(videoId);
+        return Boolean.TRUE.equals(danmuOpen);
+    }
+
+    private boolean isVideoOwner(String videoId, String userId) {
+        if (videoId == null || userId == null) {
+            return false;
+        }
+        VideoInfoDTO videoInfo = Optional.ofNullable(videoInfoClient.getVideoInfoByVideoId(videoId))
+                .orElseThrow(() -> new BusinessException(ResponseCodeEnum.CODE_600));
+        return userId.equals(videoInfo.getUserId());
     }
 }

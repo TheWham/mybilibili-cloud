@@ -197,7 +197,7 @@ public class UserVideoActionServiceImpl implements UserVideoActionService {
 
 	@Override
 	public Integer sumCoinCount(String userId) {
-		return userVideoActionMapper.sumCoinCount(userId);
+		return userVideoActionMapper.sumCoinCount(userId, UserActionTypeEnum.VIDEO_COIN.getType());
 	}
 
 	@Override

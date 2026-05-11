@@ -12,4 +12,5 @@ public final class AdminRedisKeys {
 
     public static final String SYS_SETTING_KEY = Constants.REDIS_PREFIX + "sysSetting:";
     public static final String CATEGORY_KEY = Constants.REDIS_PREFIX + "admin:category:list:";
+    public static final String CHECK_CODE_KEY = Constants.REDIS_PREFIX + "admin:checkCodeKey:";
 }

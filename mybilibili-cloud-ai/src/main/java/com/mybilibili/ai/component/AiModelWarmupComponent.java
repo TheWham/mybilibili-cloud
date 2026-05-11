@@ -17,8 +17,6 @@ import org.springframework.stereotype.Component;
 public class AiModelWarmupComponent {
 
     private static final Logger log = LoggerFactory.getLogger(AiModelWarmupComponent.class);
-    private static final int EMBEDDING_WARMUP_MAX_ATTEMPTS = 3;
-    private static final long EMBEDDING_WARMUP_RETRY_INTERVAL = 2000L;
 
     @Resource
     private OllamaClient ollamaClient;
@@ -44,14 +42,15 @@ public class AiModelWarmupComponent {
 
     private void warmupEmbeddingModel(String scene) {
         long start = System.currentTimeMillis();
-        for (int attempt = 1; attempt <= EMBEDDING_WARMUP_MAX_ATTEMPTS; attempt++) {
+        int maxAttempts = aiProperties.getWarmup().getEmbeddingMaxAttempts();
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                ollamaClient.embed("warmup");
+                ollamaClient.embed(aiProperties.getWarmup().getEmbeddingProbeText());
                 log.info("AI 向量模型预热完成, scene={}, model={}, attempt={}, cost={}ms",
                         scene, aiProperties.getOllama().getEmbeddingModel(), attempt, System.currentTimeMillis() - start);
                 return;
             } catch (Exception e) {
-                if (attempt >= EMBEDDING_WARMUP_MAX_ATTEMPTS) {
+                if (attempt >= maxAttempts) {
                     // 预热失败不影响服务启动，真正请求时还会走正常错误处理。
                     log.warn("AI 向量模型预热失败, scene={}, model={}, attempt={}, cost={}ms",
                             scene, aiProperties.getOllama().getEmbeddingModel(), attempt, System.currentTimeMillis() - start, e);
@@ -60,7 +59,7 @@ public class AiModelWarmupComponent {
                 // Ollama 刚切换模型时偶尔会返回 runner terminated，等它清理完进程后再试一次。
                 log.warn("AI 向量模型预热重试, scene={}, model={}, attempt={}, cost={}ms",
                         scene, aiProperties.getOllama().getEmbeddingModel(), attempt, System.currentTimeMillis() - start, e);
-                sleepQuietly(EMBEDDING_WARMUP_RETRY_INTERVAL);
+                sleepQuietly(aiProperties.getWarmup().getEmbeddingRetryIntervalMs());
             }
         }
     }
@@ -68,7 +67,7 @@ public class AiModelWarmupComponent {
     private void warmupChatModel() {
         long start = System.currentTimeMillis();
         try {
-            ollamaClient.chat("你是 MyBiliBili 的视频内容助手。", "用一句中文回复：模型预热完成。");
+            ollamaClient.chat(aiProperties.getWarmup().getChatSystemPrompt(), aiProperties.getWarmup().getChatUserPrompt());
             log.info("AI 对话模型预热完成, model={}, cost={}ms", aiProperties.getOllama().getChatModel(), System.currentTimeMillis() - start);
         } catch (Exception e) {
             // 这里不抛异常，避免 Ollama 暂时没启动时拖垮整个 AI 服务。

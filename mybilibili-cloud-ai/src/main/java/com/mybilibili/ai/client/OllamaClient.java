@@ -3,6 +3,7 @@ package com.mybilibili.ai.client;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybilibili.ai.config.AiProperties;
+import com.mybilibili.ai.constants.AiConstants;
 import com.mybilibili.base.exception.BusinessException;
 import jakarta.annotation.Resource;
 import okhttp3.MediaType;
@@ -51,7 +52,7 @@ public class OllamaClient {
         body.put("keep_alive", aiProperties.getOllama().getKeepAlive());
 
         try {
-            return parseEmbeddingResponse(postJson("/api/embed", body));
+            return parseEmbeddingResponse(postJson(AiConstants.OLLAMA_EMBED_API_PATH, body));
         } catch (OllamaHttpException e) {
             if (e.getStatusCode() != 404) {
                 throw buildEmbeddingException(e);
@@ -65,7 +66,7 @@ public class OllamaClient {
     public String chat(String systemPrompt, String userPrompt) {
         Map<String, Object> body = buildChatRequest(systemPrompt, userPrompt, false);
         try {
-            JsonNode root = objectMapper.readTree(postJson("/api/chat", body));
+            JsonNode root = objectMapper.readTree(postJson(AiConstants.OLLAMA_CHAT_API_PATH, body));
             String answer = root.path("message").path("content").asText("");
             if (StringUtils.isBlank(answer)) {
                 throw new BusinessException("AI 模型没有返回回答");
@@ -82,7 +83,7 @@ public class OllamaClient {
     public String streamChat(String systemPrompt, String userPrompt, Consumer<String> deltaConsumer) {
         Map<String, Object> body = buildChatRequest(systemPrompt, userPrompt, true);
         StringBuilder answer = new StringBuilder();
-        Request request = buildJsonRequest("/api/chat", body);
+        Request request = buildJsonRequest(AiConstants.OLLAMA_CHAT_API_PATH, body);
         try (Response response = getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 throw readHttpException(response);
@@ -129,7 +130,7 @@ public class OllamaClient {
         body.put("prompt", text);
         body.put("keep_alive", aiProperties.getOllama().getKeepAlive());
         try {
-            return parseEmbeddingResponse(postJson("/api/embeddings", body));
+            return parseEmbeddingResponse(postJson(AiConstants.OLLAMA_LEGACY_EMBED_API_PATH, body));
         } catch (Exception e) {
             throw buildEmbeddingException(e);
         }
@@ -196,7 +197,7 @@ public class OllamaClient {
     }
 
     private String buildUrl(String path) {
-        String baseUrl = StringUtils.defaultIfBlank(aiProperties.getOllama().getBaseUrl(), "http://127.0.0.1:11434");
+        String baseUrl = aiProperties.getOllama().getBaseUrl();
         return StringUtils.removeEnd(baseUrl, "/") + path;
     }
 

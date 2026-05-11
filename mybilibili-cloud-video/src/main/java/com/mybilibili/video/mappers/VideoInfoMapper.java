@@ -1,6 +1,6 @@
 package com.mybilibili.video.mappers;
 import com.mybilibili.common.mappers.BaseMapper;
-import com.mybilibili.video.entity.dto.VideoCountDTO;
+import com.mybilibili.base.entity.dto.VideoCountDTO;
 import com.mybilibili.video.entity.dto.VideoCountUpdateDTO;
 import org.apache.ibatis.annotations.Param;
 

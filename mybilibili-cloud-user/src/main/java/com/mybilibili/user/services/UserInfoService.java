@@ -36,9 +36,6 @@ public interface UserInfoService {
     TokenUserInfoDTO login(WebLoginDTO webLoginDTO);
     void setUserInHome(UserInfoVO userInfoVO);
 
-    //TODO 接入Video模块后恢复
-    // PaginationResultVO<VideoInfoUHomeVO> loadUHomeVideoList(String userId, Integer type, Integer pageNo, String videoName, Integer orderType);
-
     UserInfoVO getUHomeUserInfo(String userId, TokenUserInfoDTO currentUser);
     void updateUserInfoUHome(TokenUserInfoDTO tokenUserInfoDTO, UserInfo userInfo);
     void saveTheme(String userId, Integer theme);

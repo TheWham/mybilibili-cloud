@@ -22,8 +22,8 @@ import com.mybilibili.video.mappers.VideoInfoFileMapper;
 import com.mybilibili.video.mappers.VideoInfoFilePostMapper;
 import com.mybilibili.video.mappers.VideoInfoMapper;
 import com.mybilibili.video.mappers.VideoInfoPostMapper;
-import com.mybilibili.video.services.AiSubtitleVectorService;
-import com.mybilibili.video.services.VideoEsService;
+import com.mybilibili.video.consumer.AiSubtitleVectorClient;
+import com.mybilibili.video.consumer.SearchVideoClient;
 import com.mybilibili.video.services.VideoInfoFilePostService;
 import com.mybilibili.common.utils.FFmpegUtils;
 import jakarta.annotation.Resource;
@@ -68,9 +68,9 @@ public class VideoInfoFilePostServiceImpl implements VideoInfoFilePostService {
     @Resource
     private VideoInfoFileMapper<VideoInfoFile, VideoInfoFileQuery> videoInfoFileMapper;
 	@Resource
-	private VideoEsService videoEsService;
+	private SearchVideoClient searchVideoClient;
 	@Resource
-	private AiSubtitleVectorService aiSubtitleVectorService;
+	private AiSubtitleVectorClient aiSubtitleVectorClient;
 
 	/**
 	 * @description 根据条件查询
@@ -314,13 +314,13 @@ public class VideoInfoFilePostServiceImpl implements VideoInfoFilePostService {
 
 		videoInfoMapper.deleteByVideoId(videoId);
 		videoInfoPostMapper.deleteByVideoId(videoId);
-		videoEsService.deleteDoc(adminConfig.getEsIndexVideoName(),videoId);
 		deleteAiSubtitleVectorSilently(videoId);
 
 		// 2. 注册一个事务同步回调：只有当事务成功提交（COMMIT）后，才触发异步逻辑
 		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
 			@Override
 			public void afterCommit() {
+				deleteSearchDocSilently(videoId);
 				executorService.submit(()-> {
 					VideoInfoFileQuery fileQuery = new VideoInfoFileQuery();
 					if (!isAdmin)
@@ -348,9 +348,18 @@ public class VideoInfoFilePostServiceImpl implements VideoInfoFilePostService {
 
 	}
 
+	private void deleteSearchDocSilently(String videoId) {
+		try {
+			searchVideoClient.deleteVideoDoc(videoId);
+		} catch (Exception e) {
+			// MySQL 删除已提交，搜索索引失败只能记录日志，后续用重建索引兜底。
+			log.error("删除视频搜索索引失败, videoId={}", videoId, e);
+		}
+	}
+
 	private void deleteAiSubtitleVectorSilently(String videoId) {
 		try {
-			aiSubtitleVectorService.deleteByVideoId(videoId);
+			aiSubtitleVectorClient.deleteByVideoId(videoId);
 		} catch (Exception e) {
 			// 删除视频的主链路是 MySQL 和文件清理，字幕向量删除失败只记日志，后续可重跑清理。
 			log.error("删除视频字幕向量失败, videoId={}", videoId, e);

@@ -46,5 +46,5 @@ public interface UserVideoActionMapper<T, R> extends BaseMapper {
 
 	List<UserActionVO> selectActionTypeList(@Param("query") R actionQuery);
 
-    Integer sumCoinCount(@Param("videoUserId") String videoUserId);
+    Integer sumCoinCount(@Param("videoUserId") String videoUserId, @Param("actionType") Integer actionType);
 }

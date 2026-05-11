@@ -4,18 +4,19 @@ package com.mybilibili.video.controller;
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.entity.vo.ResponseVO;
+import com.mybilibili.base.entity.vo.VideoSearchResultVO;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.enums.ResponseCodeEnum;
+import com.mybilibili.base.enums.SearchOrderTypeEnum;
 import com.mybilibili.base.enums.VideoRecommendEnum;
 import com.mybilibili.base.exception.BusinessException;
 import com.mybilibili.common.controller.ABaseController;
-import com.mybilibili.video.entity.enums.SearchOrderTypeEnum;
+import com.mybilibili.video.consumer.SearchVideoClient;
 import com.mybilibili.video.entity.po.VideoInfo;
 import com.mybilibili.video.entity.po.VideoInfoFile;
 import com.mybilibili.video.entity.query.VideoInfoFileQuery;
 import com.mybilibili.video.entity.query.VideoInfoQuery;
 import com.mybilibili.video.entity.vo.VideoInfoResultVO;
-import com.mybilibili.video.services.VideoEsService;
 import com.mybilibili.video.services.VideoInfoFileService;
 import com.mybilibili.video.services.VideoInfoService;
 import jakarta.annotation.Resource;
@@ -36,7 +37,7 @@ public class VideoShowController extends ABaseController {
     @Resource
     private VideoInfoFileService videoInfoFileService;
     @Resource
-    private VideoEsService videoEsService;
+    private SearchVideoClient searchVideoClient;
 
     @RequestMapping("/loadVideo")
     public ResponseVO loadVideo(Integer pageNo, Integer pCategoryId, Integer categoryId)
@@ -57,6 +58,8 @@ public class VideoShowController extends ABaseController {
         VideoInfoQuery videoInfoQuery = new VideoInfoQuery();
         videoInfoQuery.setOrderBy("create_time desc");
         videoInfoQuery.setRecommendType(VideoRecommendEnum.RECOMMEND.getStatus());
+        videoInfoQuery.setQueryUserInfo(true);
+        videoInfoQuery.setQueryCountInfo(true);
         List<VideoInfo> recommendVideoList = videoInfoService.findListByParam(videoInfoQuery);
         return getSuccessResponseVO(recommendVideoList);
     }
@@ -92,8 +95,9 @@ public class VideoShowController extends ABaseController {
     @RequestMapping("/getVideoRecommend")
     public ResponseVO getVideoRecommend(@NotEmpty String keyword, @NotEmpty String videoId)
     {
-        List<VideoInfo> search = videoEsService.search(false, keyword, SearchOrderTypeEnum.VIDEO_PLAY.getStatus(), 1, PageSize.SIZE30.getSize()).getList();
-        List<VideoInfo> list = search.stream().filter(video -> !video.getVideoId().equals(videoId)).collect(Collectors.toList());
+        List<VideoSearchResultVO> search = searchVideoClient.searchVideo(false, keyword,
+                SearchOrderTypeEnum.VIDEO_PLAY.getStatus(), 1, PageSize.SIZE30.getSize()).getList();
+        List<VideoSearchResultVO> list = search.stream().filter(video -> !video.getVideoId().equals(videoId)).collect(Collectors.toList());
         return getSuccessResponseVO(list);
     }
 

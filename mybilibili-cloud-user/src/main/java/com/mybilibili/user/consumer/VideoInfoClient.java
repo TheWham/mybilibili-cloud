@@ -1,6 +1,7 @@
 package com.mybilibili.user.consumer;
 
 import com.mybilibili.base.constants.Constants;
+import com.mybilibili.base.entity.dto.VideoCountDTO;
 import com.mybilibili.base.entity.dto.VideoInfoDTO;
 import com.mybilibili.base.entity.dto.VideoInfoPostDTO;
 import com.mybilibili.base.entity.vo.*;
@@ -102,5 +103,16 @@ public interface VideoInfoClient {
 
     @GetMapping(Constants.INNER_API_PREFIX + "/ucenter/getVideoListByIds")
     List<VideoInfoDTO> getVideoListByIds(@RequestParam("videoIds") List<String> videoIds, @RequestParam("userId") String userId);
+
+    /**
+     * 汇总用户作为 UP 主收到的视频播放量和点赞量。
+     *
+     * <p>统计口径由 video 服务统一维护，user 服务只通过 Feign 获取结果。</p>
+     *
+     * @param userId UP 主用户 id
+     * @return 视频统计汇总
+     */
+    @GetMapping(Constants.INNER_API_PREFIX + "/countVideoInfoByUserId")
+    VideoCountDTO countVideoInfoByUserId(@RequestParam("userId") String userId);
 
 }

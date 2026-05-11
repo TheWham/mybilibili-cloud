@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.RegisterDTO;
 import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
+import com.mybilibili.base.entity.dto.VideoCountDTO;
 import com.mybilibili.base.entity.dto.WebLoginDTO;
 import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.query.UserInfoQuery;
@@ -16,6 +17,7 @@ import com.mybilibili.base.enums.ResponseCodeEnum;
 import com.mybilibili.base.enums.UserStatsRedisEnum;
 import com.mybilibili.base.exception.BusinessException;
 import com.mybilibili.common.component.TokenRedisComponent;
+import com.mybilibili.user.consumer.VideoInfoClient;
 import com.mybilibili.user.component.UserRedisComponent;
 import com.mybilibili.user.component.UserStatsCacheAsyncComponent;
 import com.mybilibili.user.entity.po.UserFocus;
@@ -51,11 +53,6 @@ import java.util.stream.Collectors;
 public class UserInfoServiceImpl implements UserInfoService {
     @Resource
     private UserInfoMapper<UserInfo, UserInfoQuery> userInfoMapper;
-    //TODO 接入Video模块
-    // @Resource
-    // private VideoInfoMapper<VideoInfo, VideoInfoQuery> videoInfoMapper;
-    // @Resource
-    // private VideoInfoService videoInfoService;
     @Resource
     private UserFocusMapper<UserFocus, UserFocusQuery> userFocusMapper;
     @Resource
@@ -68,6 +65,8 @@ public class UserInfoServiceImpl implements UserInfoService {
     private UserStatsMapper<UserStats, UserStatsQuery> userStatsMapper;
     @Resource
     private UserFocusService userFocusService;
+    @Resource
+    private VideoInfoClient videoInfoClient;
 
     @Override
     public List<UserInfo> findListByParam(UserInfoQuery param) {
@@ -214,12 +213,6 @@ public class UserInfoServiceImpl implements UserInfoService {
         userInfoVO.setFocusCount(Optional.ofNullable(userStats.getFocusCount()).orElse(0));
     }
 
-    //TODO 接入Video模块后恢复此方法
-    // @Override
-    // public PaginationResultVO<VideoInfoUHomeVO> loadUHomeVideoList(String userId, Integer type, Integer pageNo, String videoName, Integer orderType) {
-    //     ...
-    // }
-
     @Override
     public UserInfoVO getUHomeUserInfo(String userId, TokenUserInfoDTO currentUser) {
         UserInfo userInfoDb = this.getUserInfoByUserId(userId);
@@ -314,12 +307,25 @@ public class UserInfoServiceImpl implements UserInfoService {
         fansQuery.setUserFocusId(userId);
         userCountVO.setFansCount(Optional.ofNullable(userFocusMapper.selectCount(fansQuery)).orElse(0));
 
-        //TODO 接入Video模块: 需要 videoInfoMapper.sumVideoCountByUserId()
-        // VideoCountDTO videoCountDTO = videoInfoMapper.sumVideoCountByUserId(userId);
-        // if (videoCountDTO == null) { ... }
-        userCountVO.setLikeCount(0);
-        userCountVO.setPlayCount(0);
+        fillVideoCount(userCountVO, userId);
         return userCountVO;
+    }
+
+    private void fillVideoCount(UserCountVO userCountVO, String userId) {
+        VideoCountDTO videoCountDTO = null;
+        try {
+            // 用户主页冷启动时只缺少展示统计，video 服务短暂异常不应该影响用户基础信息返回。
+            videoCountDTO = videoInfoClient.countVideoInfoByUserId(userId);
+        } catch (Exception e) {
+            log.warn("查询用户视频统计失败，userId:{}", userId, e);
+        }
+        if (videoCountDTO == null) {
+            userCountVO.setLikeCount(0);
+            userCountVO.setPlayCount(0);
+            return;
+        }
+        userCountVO.setLikeCount(Optional.ofNullable(videoCountDTO.getTotalLikeCount()).orElse(0));
+        userCountVO.setPlayCount(Optional.ofNullable(videoCountDTO.getTotalPlayCount()).orElse(0));
     }
 
     private void fillUserInfoVOWithRealtimeStats(UserInfoVO userInfoVO, HashMap<String, Integer> userStatsMap) {

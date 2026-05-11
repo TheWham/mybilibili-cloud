@@ -2,15 +2,22 @@ package com.mybilibili.interact.provider;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.mybilibili.base.constants.Constants;
+import com.mybilibili.base.entity.dto.UserInteractCountDTO;
 import com.mybilibili.base.entity.dto.UserInfoDTO;
+import com.mybilibili.base.entity.query.UserActionQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
+import com.mybilibili.base.entity.vo.UserCollectionVO;
 import com.mybilibili.base.entity.vo.VideoCommentInUCenterVO;
 import com.mybilibili.base.entity.vo.VideoDanmuVO;
+import com.mybilibili.base.enums.UserActionTypeEnum;
+import com.mybilibili.base.exception.BusinessException;
 import com.mybilibili.interact.consumer.UserInfoClient;
+import com.mybilibili.interact.consumer.VideoInfoClient;
 import com.mybilibili.interact.entity.po.VideoComment;
 import com.mybilibili.interact.entity.po.VideoDanmu;
 import com.mybilibili.interact.entity.query.VideoCommentQuery;
 import com.mybilibili.interact.entity.query.VideoDanmuQuery;
+import com.mybilibili.interact.services.UserVideoActionService;
 import com.mybilibili.interact.services.VideoCommentService;
 import com.mybilibili.interact.services.VideoDanmuService;
 import jakarta.annotation.Resource;
@@ -19,7 +26,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.alibaba.nacos.client.utils.EnvUtil.LOGGER;
@@ -36,6 +48,10 @@ public class CommentAndDanmuApi {
 
     @Resource
     private UserInfoClient userInfoClient;
+    @Resource
+    private UserVideoActionService userVideoActionService;
+    @Resource
+    private VideoInfoClient videoInfoClient;
 
 
     /**
@@ -58,6 +74,7 @@ public class CommentAndDanmuApi {
         query.setOrderBy("v.comment_id desc");
         PaginationResultVO<VideoComment> page = videoCommentService.findListByPage(query);
         fillCommentUserInfo(page.getList());
+        fillCommentVideoInfo(page.getList());
         return copyPage(page, VideoCommentInUCenterVO.class);
     }
 
@@ -76,6 +93,7 @@ public class CommentAndDanmuApi {
         videoCommentQuery.setOrderBy("v.comment_id desc");
         PaginationResultVO<VideoComment> page = videoCommentService.findListByPage(videoCommentQuery);
         fillCommentUserInfo(page.getList());
+        fillCommentVideoInfo(page.getList());
         return copyPage(page, VideoCommentInUCenterVO.class);
     }
 
@@ -96,6 +114,7 @@ public class CommentAndDanmuApi {
         query.setOrderBy("v.time asc");
         PaginationResultVO<VideoDanmu> page = videoDanmuService.findListByPage(query);
         fillUserName4DanmuList(page.getList());
+        fillDanmuVideoInfo(page.getList());
         return copyPage(page, VideoDanmuVO.class);
     }
 
@@ -115,6 +134,87 @@ public class CommentAndDanmuApi {
     public void delDanmu(@RequestParam("danmuId") Integer danmuId,
                          @RequestParam("userId") String userId) {
         videoDanmuService.deleteVideoDanmuByDanmuId(danmuId, false, userId);
+    }
+
+    /**
+     * 汇总用户作为 UP 主收到的互动数据。
+     *
+     * <p>评论、弹幕和用户行为表都属于 interact 模块，user 服务只通过这个内部接口
+     * 拿创作者中心需要展示的结果，避免跨模块读表。</p>
+     *
+     * @param userId UP 主用户 id
+     * @return 互动统计汇总
+     */
+    @RequestMapping("/countUserInteractByUserId")
+    public UserInteractCountDTO countUserInteractByUserId(@RequestParam("userId") String userId) {
+        UserInteractCountDTO countDTO = new UserInteractCountDTO();
+
+        VideoCommentQuery commentQuery = new VideoCommentQuery();
+        commentQuery.setVideoUserId(userId);
+        countDTO.setCommentCount(defaultValue(videoCommentService.findCountByParam(commentQuery)));
+
+        VideoDanmuQuery danmuQuery = new VideoDanmuQuery();
+        danmuQuery.setVideoUserId(userId);
+        countDTO.setDanmuCount(defaultValue(videoDanmuService.findCountByParam(danmuQuery)));
+
+        countDTO.setCoinCount(defaultValue(userVideoActionService.sumCoinCount(userId)));
+
+        UserActionQuery collectQuery = new UserActionQuery();
+        collectQuery.setVideoUserId(userId);
+        collectQuery.setActionType(UserActionTypeEnum.VIDEO_COLLECT.getType());
+        countDTO.setCollectCount(defaultValue(userVideoActionService.findCountByParam(collectQuery)));
+        return countDTO;
+    }
+
+    @RequestMapping("/admin/interact/loadComment")
+    public PaginationResultVO<VideoCommentInUCenterVO> adminLoadComment(@RequestParam(value = "pageNo", required = false) Integer pageNo,
+                                                                        @RequestParam(value = "pageSize", required = false) Integer pageSize,
+                                                                        @RequestParam(value = "videoNameFuzzy", required = false) String videoNameFuzzy) {
+        VideoCommentQuery query = new VideoCommentQuery();
+        query.setPageNo(pageNo);
+        query.setPageSize(pageSize);
+        query.setQueryChildren(false);
+        query.setQueryUserInfo(true);
+        query.setOrderBy("v.post_time desc");
+
+        PaginationResultVO<VideoComment> page = videoCommentService.findListByPage(query);
+        fillCommentUserInfo(page.getList());
+        fillCommentVideoInfo(page.getList());
+        filterCommentByVideoName(page, videoNameFuzzy);
+        return copyPage(page, VideoCommentInUCenterVO.class);
+    }
+
+    @RequestMapping("/admin/interact/loadDanmu")
+    public PaginationResultVO<VideoDanmuVO> adminLoadDanmu(@RequestParam(value = "pageNo", required = false) Integer pageNo,
+                                                          @RequestParam(value = "pageSize", required = false) Integer pageSize,
+                                                          @RequestParam(value = "videoNameFuzzy", required = false) String videoNameFuzzy) {
+        VideoDanmuQuery query = new VideoDanmuQuery();
+        query.setPageNo(pageNo);
+        query.setPageSize(pageSize);
+        query.setQueryUserInfo(true);
+        query.setOrderBy("v.post_time desc");
+
+        PaginationResultVO<VideoDanmu> page = videoDanmuService.findListByPage(query);
+        fillUserName4DanmuList(page.getList());
+        fillDanmuVideoInfo(page.getList());
+        filterDanmuByVideoName(page, videoNameFuzzy);
+        return copyPage(page, VideoDanmuVO.class);
+    }
+
+    @RequestMapping("/admin/interact/delComment")
+    public void adminDelComment(@RequestParam("commentId") Integer commentId) {
+        Integer count = videoCommentService.deleteByCommentId(commentId, true, null);
+        if (count == null || count == 0) {
+            throw new BusinessException("删除评论失败");
+        }
+    }
+
+    @RequestMapping("/admin/interact/delDanmu")
+    public void adminDelDanmu(@RequestParam("danmuId") Integer danmuId) {
+        Integer count = videoDanmuService.deleteVideoDanmuByDanmuId(danmuId, true, null);
+        if (count == null || count == 0) {
+            throw new BusinessException("删除弹幕失败");
+        }
     }
 
     private <S, T> PaginationResultVO<T> copyPage(PaginationResultVO<S> sourcePage, Class<T> targetClass) {
@@ -215,6 +315,34 @@ public class CommentAndDanmuApi {
         }
     }
 
+    private void fillCommentVideoInfo(List<VideoComment> commentList) {
+        if (commentList == null || commentList.isEmpty()) {
+            return;
+        }
+        Map<String, UserCollectionVO> videoInfoMap = loadVideoInfoMap(commentList.stream()
+                .map(VideoComment::getVideoId)
+                .filter(videoId -> videoId != null && !videoId.isBlank())
+                .distinct()
+                .toList());
+        if (videoInfoMap.isEmpty()) {
+            return;
+        }
+        for (VideoComment comment : commentList) {
+            fillSingleCommentVideoInfo(comment, videoInfoMap);
+        }
+    }
+
+    private void fillSingleCommentVideoInfo(VideoComment comment, Map<String, UserCollectionVO> videoInfoMap) {
+        if (comment == null || comment.getVideoId() == null) {
+            return;
+        }
+        UserCollectionVO videoInfo = videoInfoMap.get(comment.getVideoId());
+        if (videoInfo != null) {
+            comment.setVideoName(videoInfo.getVideoName());
+            comment.setVideoCover(videoInfo.getVideoCover());
+        }
+    }
+
     void fillUserName4DanmuList(List<VideoDanmu> videoDanmuList)
     {
         if (videoDanmuList == null || videoDanmuList.isEmpty()) {
@@ -252,6 +380,46 @@ public class CommentAndDanmuApi {
         }
     }
 
+    private void fillDanmuVideoInfo(List<VideoDanmu> videoDanmuList) {
+        if (videoDanmuList == null || videoDanmuList.isEmpty()) {
+            return;
+        }
+        Map<String, UserCollectionVO> videoInfoMap = loadVideoInfoMap(videoDanmuList.stream()
+                .map(VideoDanmu::getVideoId)
+                .filter(videoId -> videoId != null && !videoId.isBlank())
+                .distinct()
+                .toList());
+        if (videoInfoMap.isEmpty()) {
+            return;
+        }
+        for (VideoDanmu videoDanmu : videoDanmuList) {
+            UserCollectionVO videoInfo = videoInfoMap.get(videoDanmu.getVideoId());
+            if (videoInfo != null) {
+                videoDanmu.setVideoName(videoInfo.getVideoName());
+            }
+        }
+    }
+
+    private Map<String, UserCollectionVO> loadVideoInfoMap(List<String> videoIds) {
+        if (videoIds == null || videoIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<UserCollectionVO> videoInfoList;
+        try {
+            videoInfoList = videoInfoClient.loadCollectionVideoInfo(videoIds);
+        } catch (Exception e) {
+            // 视频标题、封面只是用户中心列表展示字段，video 短暂不可用时保留评论/弹幕主体数据。
+            LOGGER.warn("批量查询视频展示信息失败，videoIdCount:{}", videoIds.size(), e);
+            return Collections.emptyMap();
+        }
+        if (videoInfoList == null || videoInfoList.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return videoInfoList.stream()
+                .filter(videoInfo -> videoInfo.getVideoId() != null)
+                .collect(Collectors.toMap(UserCollectionVO::getVideoId, videoInfo -> videoInfo, (left, right) -> left));
+    }
+
     private void fillSingleDanmu(VideoDanmu videoDanmu, Map<String, UserInfoDTO> userIdsMap)
     {
         if (videoDanmu == null || videoDanmu.getUserId() == null) {
@@ -261,5 +429,27 @@ public class CommentAndDanmuApi {
         if (userInfo != null) {
             videoDanmu.setNickName(userInfo.getNickName());
         }
+    }
+
+    private Integer defaultValue(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private void filterCommentByVideoName(PaginationResultVO<VideoComment> page, String videoNameFuzzy) {
+        if (videoNameFuzzy == null || videoNameFuzzy.isBlank() || page.getList() == null) {
+            return;
+        }
+        page.setList(page.getList().stream()
+                .filter(comment -> comment.getVideoName() != null && comment.getVideoName().contains(videoNameFuzzy))
+                .toList());
+    }
+
+    private void filterDanmuByVideoName(PaginationResultVO<VideoDanmu> page, String videoNameFuzzy) {
+        if (videoNameFuzzy == null || videoNameFuzzy.isBlank() || page.getList() == null) {
+            return;
+        }
+        page.setList(page.getList().stream()
+                .filter(danmu -> danmu.getVideoName() != null && danmu.getVideoName().contains(videoNameFuzzy))
+                .toList());
     }
 }

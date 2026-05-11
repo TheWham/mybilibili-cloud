@@ -5,6 +5,7 @@ import com.mybilibili.admin.constants.AdminRedisKeys;
 import com.mybilibili.admin.convert.SysSettingConverter;
 import com.mybilibili.admin.entity.po.SysSetting;
 import com.mybilibili.admin.services.SysSettingService;
+import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.SysSettingDTO;
 import com.mybilibili.admin.entity.po.CategoryInfo;
 import com.mybilibili.common.redis.RedisUtils;
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 
 /**
  * 后台管理缓存。
@@ -42,6 +45,25 @@ public class AdminRedisComponent {
             return (List<CategoryInfo>) list;
         }
         return JSON.parseArray(JSON.toJSONString(value), CategoryInfo.class);
+    }
+
+    public String saveCode(String code) {
+        String checkCodeKey = UUID.randomUUID().toString();
+        long expireTime = (long) Constants.REDIS_EXPIRE_TIME_ONE_MINUTE * Constants.REDIS_EXPIRE_TIME_MINUTE_COUNT;
+        redisUtils.setex(AdminRedisKeys.CHECK_CODE_KEY + checkCodeKey, code, expireTime);
+        return checkCodeKey;
+    }
+
+    public String getCode(String checkCodeKey) {
+        Object value = redisUtils.get(AdminRedisKeys.CHECK_CODE_KEY + checkCodeKey);
+        if (Objects.isNull(value)) {
+            return null;
+        }
+        return value.toString();
+    }
+
+    public void cleanCheckCode(String checkCodeKey) {
+        redisUtils.delete(AdminRedisKeys.CHECK_CODE_KEY + checkCodeKey);
     }
 
     public SysSettingDTO getSysSetting() {

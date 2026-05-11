@@ -2,6 +2,7 @@ package com.mybilibili.user.consumer;
 
 
 import com.mybilibili.base.constants.Constants;
+import com.mybilibili.base.entity.dto.UserInteractCountDTO;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.entity.vo.VideoCommentInUCenterVO;
 import com.mybilibili.base.entity.vo.VideoDanmuVO;
@@ -44,5 +45,14 @@ public interface InteractClient {
     @GetMapping(Constants.INNER_API_PREFIX + "/delDanmu")
     void delDanmu(@RequestParam("danmuId") Integer danmuId,
                   @RequestParam("userId") String userId);
+
+    /**
+     * 汇总用户作为 UP 主收到的评论、弹幕、投币和收藏数据。
+     *
+     * @param userId UP 主用户 id
+     * @return 互动统计汇总
+     */
+    @GetMapping(Constants.INNER_API_PREFIX + "/countUserInteractByUserId")
+    UserInteractCountDTO countUserInteractByUserId(@RequestParam("userId") String userId);
 
 }

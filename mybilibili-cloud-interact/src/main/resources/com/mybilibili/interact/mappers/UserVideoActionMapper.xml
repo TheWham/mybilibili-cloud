@@ -304,6 +304,7 @@
 		SELECT IFNULL(SUM(action_count), 0)
 		FROM user_video_action
 		WHERE video_user_id = #{videoUserId}
+		  AND action_type = #{actionType}
 	</select>
 	<!--根据VideoIdAndActionTypeAndUserIdAnd删除 -->
 	<delete id="deleteByVideoIdAndActionTypeAndUserId">

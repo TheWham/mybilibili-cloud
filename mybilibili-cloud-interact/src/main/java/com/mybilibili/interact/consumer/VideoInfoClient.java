@@ -44,4 +44,13 @@ public interface VideoInfoClient {
      */
     @GetMapping(Constants.INNER_API_PREFIX + "/checkVideoCommentStatusByVideoId")
     Boolean checkVideoCommentStatusByVideoId(@RequestParam("videoId") String videoId);
+
+    /**
+     * 根据视频 id 查询弹幕是否开启。
+     *
+     * @param videoId 视频 id
+     * @return true：允许弹幕；false：关闭弹幕
+     */
+    @GetMapping(Constants.INNER_API_PREFIX + "/checkVideoDanmuStatusByVideoId")
+    Boolean checkVideoDanmuStatusByVideoId(@RequestParam("videoId") String videoId);
 }

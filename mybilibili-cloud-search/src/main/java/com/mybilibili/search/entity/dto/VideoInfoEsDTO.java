@@ -1,4 +1,4 @@
-package com.mybilibili.video.entity.dto;
+package com.mybilibili.search.entity.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.springframework.format.annotation.DateTimeFormat;

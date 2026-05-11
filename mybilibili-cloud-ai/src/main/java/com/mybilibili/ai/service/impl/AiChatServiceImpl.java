@@ -2,6 +2,7 @@ package com.mybilibili.ai.service.impl;
 
 import com.mybilibili.ai.client.OllamaClient;
 import com.mybilibili.ai.config.AiProperties;
+import com.mybilibili.ai.constants.AiConstants;
 import com.mybilibili.ai.entity.dto.AiChatRequestDTO;
 import com.mybilibili.ai.entity.dto.AiConversationContextDTO;
 import com.mybilibili.ai.entity.vo.AiChatResultVO;
@@ -24,6 +25,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -33,15 +35,6 @@ import java.util.function.Consumer;
 public class AiChatServiceImpl implements AiChatService {
 
     private static final Logger log = LoggerFactory.getLogger(AiChatServiceImpl.class);
-    private static final int EMBEDDING_MAX_ATTEMPTS = 2;
-    private static final int SSE_ANSWER_CHUNK_SIZE = 16;
-    private static final long EMBEDDING_RETRY_INTERVAL = 1500L;
-    private static final long SSE_TIMEOUT = 180000L;
-    private static final String MATCH_TYPE_TITLE = "title";
-    private static final String SUGGESTION_TYPE_CONTINUE = "continue";
-    private static final String SUGGESTION_TYPE_VIDEO = "video";
-    private static final String SUGGESTION_TYPE_MORE = "more";
-    private static final String SYSTEM_PROMPT = "你是 MyBiliBili 的视频内容助手。回答要基于给定视频字幕片段，不要编造片段里没有的信息。";
 
     @Resource
     private OllamaClient ollamaClient;
@@ -61,24 +54,24 @@ public class AiChatServiceImpl implements AiChatService {
     public SseEmitter streamChat(AiChatRequestDTO request) {
         AiChatRequestDTO safeRequest = request == null ? new AiChatRequestDTO() : request;
         String conversationId = resolveConversationId(safeRequest);
-        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
+        SseEmitter emitter = new SseEmitter(aiProperties.getChat().getSseTimeoutMs());
         aiChatExecutor.execute(() -> {
             try {
                 Map<String, Object> startData = new HashMap<>(1);
-                startData.put("conversationId", conversationId);
-                sendEvent(emitter, "start", startData);
+                startData.put(AiConstants.SSE_FIELD_CONVERSATION_ID, conversationId);
+                sendEvent(emitter, AiConstants.SSE_EVENT_START, startData);
 
                 AiChatResultVO resultVO = buildChatResult(safeRequest, delta -> sendDelta(emitter, delta));
-                sendEvent(emitter, "videos", resultVO.getVideos());
-                sendEvent(emitter, "suggestions", resultVO.getSuggestionActions());
-                sendEvent(emitter, "done", resultVO);
+                sendEvent(emitter, AiConstants.SSE_EVENT_VIDEOS, resultVO.getVideos());
+                sendEvent(emitter, AiConstants.SSE_EVENT_SUGGESTIONS, resultVO.getSuggestionActions());
+                sendEvent(emitter, AiConstants.SSE_EVENT_DONE, resultVO);
                 emitter.complete();
             } catch (Exception e) {
                 log.error("AI SSE 问答失败, conversationId={}", conversationId, e);
                 try {
                     Map<String, Object> errorData = new HashMap<>(1);
-                    errorData.put("message", getClientErrorMessage(e));
-                    sendEvent(emitter, "error", errorData);
+                    errorData.put(AiConstants.SSE_FIELD_MESSAGE, getClientErrorMessage(e));
+                    sendEvent(emitter, AiConstants.SSE_EVENT_ERROR, errorData);
                     emitter.complete();
                 } catch (Exception sendError) {
                     emitter.completeWithError(sendError);
@@ -220,7 +213,8 @@ public class AiChatServiceImpl implements AiChatService {
 
     private List<Double> buildQueryVector(String keyword) {
         Exception lastException = null;
-        for (int attempt = 1; attempt <= EMBEDDING_MAX_ATTEMPTS; attempt++) {
+        int maxAttempts = aiProperties.getEmbedding().getQueryMaxAttempts();
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 List<Double> output = ollamaClient.embed(keyword);
                 if (output == null || output.isEmpty()) {
@@ -233,19 +227,19 @@ public class AiChatServiceImpl implements AiChatService {
                 return output;
             } catch (BusinessException e) {
                 lastException = e;
-                if (attempt >= EMBEDDING_MAX_ATTEMPTS) {
+                if (attempt >= maxAttempts) {
                     break;
                 }
                 log.warn("生成查询向量失败，准备重试, keyword={}, attempt={}", keyword, attempt, e);
-                sleepQuietly(EMBEDDING_RETRY_INTERVAL);
+                sleepQuietly(aiProperties.getEmbedding().getRetryIntervalMs());
             } catch (Exception e) {
                 lastException = e;
-                if (attempt >= EMBEDDING_MAX_ATTEMPTS) {
+                if (attempt >= maxAttempts) {
                     break;
                 }
                 // Ollama 模型刚被调度起来时偶发 runner 退出，短暂等待后重试通常能恢复。
                 log.warn("生成查询向量失败，准备重试, keyword={}, attempt={}", keyword, attempt, e);
-                sleepQuietly(EMBEDDING_RETRY_INTERVAL);
+                sleepQuietly(aiProperties.getEmbedding().getRetryIntervalMs());
             }
         }
         log.error("生成查询向量失败, keyword={}", keyword, lastException);
@@ -267,9 +261,9 @@ public class AiChatServiceImpl implements AiChatService {
                                  Consumer<String> deltaConsumer) {
         String prompt = buildPrompt(message, previousContext, sourceSuggestion, matchedVideos);
         if (deltaConsumer != null) {
-            return ollamaClient.streamChat(SYSTEM_PROMPT, prompt, deltaConsumer);
+            return ollamaClient.streamChat(aiProperties.getChat().getSystemPrompt(), prompt, deltaConsumer);
         }
-        return ollamaClient.chat(SYSTEM_PROMPT, prompt);
+        return ollamaClient.chat(aiProperties.getChat().getSystemPrompt(), prompt);
     }
 
     private AiSuggestionActionVO findSourceSuggestion(AiConversationContextDTO previousContext, String sourceSuggestionId) {
@@ -341,7 +335,7 @@ public class AiChatServiceImpl implements AiChatService {
         }
         List<AiMatchedVideoVO> subtitleMatches = new ArrayList<>();
         for (AiMatchedVideoVO matchedVideo : matchedVideos) {
-            if (!MATCH_TYPE_TITLE.equals(matchedVideo.getMatchType())) {
+            if (!AiConstants.MATCH_TYPE_TITLE.equals(matchedVideo.getMatchType())) {
                 subtitleMatches.add(matchedVideo);
             }
         }
@@ -354,7 +348,7 @@ public class AiChatServiceImpl implements AiChatService {
         }
         List<AiMatchedVideoVO> titleMatches = new ArrayList<>();
         for (AiMatchedVideoVO matchedVideo : matchedVideos) {
-            if (matchedVideo != null && MATCH_TYPE_TITLE.equals(matchedVideo.getMatchType())) {
+            if (matchedVideo != null && AiConstants.MATCH_TYPE_TITLE.equals(matchedVideo.getMatchType())) {
                 titleMatches.add(matchedVideo);
             }
         }
@@ -362,17 +356,17 @@ public class AiChatServiceImpl implements AiChatService {
     }
 
     private boolean isShortKeyword(String keyword) {
-        return StringUtils.length(StringUtils.trimToEmpty(keyword)) <= 2;
+        return StringUtils.length(StringUtils.trimToEmpty(keyword)) <= aiProperties.getChat().getShortKeywordLength();
     }
 
     private boolean hasSubtitleKeywordHit(List<AiMatchedVideoVO> subtitleMatches, String keyword) {
         if (subtitleMatches == null || subtitleMatches.isEmpty() || StringUtils.isBlank(keyword)) {
             return false;
         }
-        String lowerKeyword = keyword.toLowerCase();
+        String lowerKeyword = keyword.toLowerCase(Locale.ROOT);
         for (AiMatchedVideoVO matchedVideo : subtitleMatches) {
             String matchedText = matchedVideo == null ? null : matchedVideo.getMatchedText();
-            if (StringUtils.contains(StringUtils.lowerCase(matchedText), lowerKeyword)) {
+            if (StringUtils.contains(StringUtils.lowerCase(matchedText, Locale.ROOT), lowerKeyword)) {
                 return true;
             }
         }
@@ -407,7 +401,8 @@ public class AiChatServiceImpl implements AiChatService {
         prompt.append("用户本轮问题：").append(message).append("\n\n")
                 .append("可参考的视频字幕片段：\n").append(context).append("\n")
                 .append("请只基于这些字幕片段回答，不要根据视频标题补充信息。")
-                .append("回答控制在120字以内，先说明片段里能确认的内容，再给出可观看的视频。");
+                .append("回答控制在").append(aiProperties.getChat().getAnswerMaxWords())
+                .append("字以内，先说明片段里能确认的内容，再给出可观看的视频。");
         return prompt.toString();
     }
 
@@ -432,9 +427,9 @@ public class AiChatServiceImpl implements AiChatService {
 
     private List<AiSuggestionActionVO> buildNoMatchSuggestionActions(String keyword) {
         List<AiSuggestionActionVO> suggestions = new ArrayList<>(3);
-        suggestions.add(buildSuggestionAction("换一个更具体的关键词重新查询", SUGGESTION_TYPE_CONTINUE, null, null));
-        suggestions.add(buildSuggestionAction("查询和“" + keyword + "”相关的视频", SUGGESTION_TYPE_MORE, null, null));
-        suggestions.add(buildSuggestionAction("按分类或热门视频先筛选内容", SUGGESTION_TYPE_MORE, null, null));
+        suggestions.add(buildSuggestionAction("换一个更具体的关键词重新查询", AiConstants.SUGGESTION_TYPE_CONTINUE, null, null));
+        suggestions.add(buildSuggestionAction("查询和“" + keyword + "”相关的视频", AiConstants.SUGGESTION_TYPE_MORE, null, null));
+        suggestions.add(buildSuggestionAction("按分类或热门视频先筛选内容", AiConstants.SUGGESTION_TYPE_MORE, null, null));
         return suggestions;
     }
 
@@ -444,20 +439,20 @@ public class AiChatServiceImpl implements AiChatService {
         }
         List<AiSuggestionActionVO> suggestions = new ArrayList<>(3);
         AiMatchedVideoVO firstVideo = matchedVideos.get(0);
-        suggestions.add(buildSuggestionAction("继续了解“" + keyword + "”的实现细节", SUGGESTION_TYPE_CONTINUE, null, null));
+        suggestions.add(buildSuggestionAction("继续了解“" + keyword + "”的实现细节", AiConstants.SUGGESTION_TYPE_CONTINUE, null, null));
         suggestions.add(buildSuggestionAction(
                 "查看《" + firstVideo.getVideoName() + "》里的相关片段",
-                SUGGESTION_TYPE_VIDEO,
+                AiConstants.SUGGESTION_TYPE_VIDEO,
                 firstVideo.getVideoId(),
                 firstVideo.getMatchType()
         ));
-        suggestions.add(buildSuggestionAction("查询这个主题下更多相似视频", SUGGESTION_TYPE_MORE, null, null));
+        suggestions.add(buildSuggestionAction("查询这个主题下更多相似视频", AiConstants.SUGGESTION_TYPE_MORE, null, null));
         return suggestions;
     }
 
     private AiSuggestionActionVO buildSuggestionAction(String text, String type, String sourceVideoId, String sourceMatchType) {
         AiSuggestionActionVO action = new AiSuggestionActionVO();
-        action.setSuggestionId("sug_" + UUID.randomUUID().toString().replace("-", ""));
+        action.setSuggestionId(AiConstants.SUGGESTION_ID_PREFIX + UUID.randomUUID().toString().replace("-", ""));
         action.setText(text);
         action.setType(type);
         action.setSourceVideoId(sourceVideoId);
@@ -510,15 +505,16 @@ public class AiChatServiceImpl implements AiChatService {
             deltaConsumer.accept("");
             return;
         }
-        for (int start = 0; start < safeAnswer.length(); start += SSE_ANSWER_CHUNK_SIZE) {
-            int end = Math.min(start + SSE_ANSWER_CHUNK_SIZE, safeAnswer.length());
+        int chunkSize = aiProperties.getChat().getFixedAnswerChunkSize();
+        for (int start = 0; start < safeAnswer.length(); start += chunkSize) {
+            int end = Math.min(start + chunkSize, safeAnswer.length());
             deltaConsumer.accept(safeAnswer.substring(start, end));
         }
     }
 
     private void sendDelta(SseEmitter emitter, String delta) {
         try {
-            sendEvent(emitter, "delta", delta);
+            sendEvent(emitter, AiConstants.SSE_EVENT_DELTA, delta);
         } catch (IOException e) {
             throw new BusinessException("AI SSE 输出失败", e);
         }
@@ -539,8 +535,8 @@ public class AiChatServiceImpl implements AiChatService {
     }
 
     private int normalizeTopK(Integer topK) {
-        int defaultTopK = aiProperties.getRag().getDefaultTopK() == null ? 5 : aiProperties.getRag().getDefaultTopK();
-        int maxTopK = aiProperties.getRag().getMaxTopK() == null ? 10 : aiProperties.getRag().getMaxTopK();
+        int defaultTopK = aiProperties.getRag().getDefaultTopK();
+        int maxTopK = aiProperties.getRag().getMaxTopK();
         if (topK == null || topK <= 0) {
             return defaultTopK;
         }

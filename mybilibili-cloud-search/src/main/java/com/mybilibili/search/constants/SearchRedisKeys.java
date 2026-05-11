@@ -11,4 +11,5 @@ public final class SearchRedisKeys {
     }
 
     public static final String VIDEO_SEARCH_COUNT = Constants.REDIS_PREFIX + "video:search:";
+    public static final String VIDEO_ACTION_COUNT_DELTA = Constants.REDIS_PREFIX + "video:action:delta:";
 }

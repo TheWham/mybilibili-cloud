@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.UserActionSyncDTO;
 import com.mybilibili.base.entity.dto.UserVideoSeriesDTO;
+import com.mybilibili.base.entity.dto.VideoCountDTO;
 import com.mybilibili.base.entity.dto.VideoInfoDTO;
 import com.mybilibili.base.entity.dto.VideoInfoFilePostDTO;
 import com.mybilibili.base.entity.dto.VideoInfoPostDTO;
@@ -38,6 +39,9 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping(Constants.INNER_API_PREFIX)
 public class VideoInfoApi{
+
+    private static final String CLOSE_COMMENT_INTERACTION = Constants.ONE.toString();
+    private static final String CLOSE_DANMU_INTERACTION = Constants.TWO.toString();
 
     @Resource
     private VideoInfoService videoInfoService;
@@ -263,6 +267,23 @@ public class VideoInfoApi{
         return BeanUtil.copyToList(videoInfoService.findListByParam(videoInfoQuery), VideoInfoDTO.class);
     }
 
+    /**
+     * 分页提供搜索索引源数据。
+     *
+     * <p>search 服务重建索引时只需要正式视频表的数据，分页拉取可以避免一次性加载过多视频。
+     * 这里仍然返回 base 模块 DTO，不把 video 的 PO 暴露给 search。</p>
+     */
+    @RequestMapping("/search/loadVideoIndexSource")
+    public PaginationResultVO<VideoInfoDTO> loadVideoIndexSource(@RequestParam("pageNo") Integer pageNo,
+                                                                 @RequestParam("pageSize") Integer pageSize) {
+        VideoInfoQuery videoInfoQuery = new VideoInfoQuery();
+        videoInfoQuery.setPageNo(pageNo);
+        videoInfoQuery.setPageSize(pageSize);
+        videoInfoQuery.setOrderBy("v.create_time asc");
+        PaginationResultVO<VideoInfo> page = videoInfoService.findListByPage(videoInfoQuery);
+        return copyPage(page, VideoInfoDTO.class);
+    }
+
     @RequestMapping("/collection/loadVideoInfo")
     public List<UserCollectionVO> loadCollectionVideoInfo(@RequestParam("videoIds") List<String> videoIds) {
         if (videoIds == null || videoIds.isEmpty()) {
@@ -304,11 +325,42 @@ public class VideoInfoApi{
             throw new BusinessException(ResponseCodeEnum.CODE_600);
         }
 
-        // 当前 video_info 是前台正式视频表；如果后续把审核态也落到这里，再补充状态判断。
-        if (videoInfo.getInteraction() != null && videoInfo.getInteraction().contains(Constants.ONE.toString())) {
-            return false;
+        // interaction 是投稿侧保存的互动开关，当前约定包含 1 表示关闭评论。
+        return !isInteractionClosed(videoInfo.getInteraction(), CLOSE_COMMENT_INTERACTION);
+    }
+
+    /**
+     * 根据视频 id 查询弹幕开关。
+     *
+     * <p>弹幕是否允许发送由 video 服务维护，interact 只消费这个结论，
+     * 避免多个服务各自解释 interaction 字段。</p>
+     *
+     * @param videoId 视频 id
+     * @return true：允许弹幕；false：关闭弹幕
+     */
+    @RequestMapping("/checkVideoDanmuStatusByVideoId")
+    public Boolean checkVideoDanmuStatusByVideoId(@RequestParam("videoId") String videoId) {
+        VideoInfo videoInfo = videoInfoService.getVideoInfoByVideoId(videoId);
+        if (videoInfo == null) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600);
         }
-        return true;
+
+        // 当前约定包含 2 表示关闭弹幕，后续如果 interaction 改成结构化配置，只需要改这里。
+        return !isInteractionClosed(videoInfo.getInteraction(), CLOSE_DANMU_INTERACTION);
+    }
+
+    /**
+     * 汇总 UP 主所有公开视频的播放量和点赞量。
+     *
+     * <p>user 服务只需要展示统计值，不应该直接读取 video_info 表。</p>
+     *
+     * @param userId UP 主用户 id
+     * @return 视频统计汇总
+     */
+    @RequestMapping("/countVideoInfoByUserId")
+    public VideoCountDTO countVideoInfoByUserId(@RequestParam("userId") String userId) {
+        VideoCountDTO videoCountDTO = videoInfoService.sumVideoCountByUserId(userId);
+        return videoCountDTO == null ? new VideoCountDTO() : videoCountDTO;
     }
 
 
@@ -362,6 +414,10 @@ public class VideoInfoApi{
         vo.setPlayCount(queryDTO.getPlayCount());
         vo.setCreateTime(queryDTO.getCreateTime());
         return vo;
+    }
+
+    private boolean isInteractionClosed(String interaction, String closeType) {
+        return interaction != null && closeType != null && interaction.contains(closeType);
     }
 
 }

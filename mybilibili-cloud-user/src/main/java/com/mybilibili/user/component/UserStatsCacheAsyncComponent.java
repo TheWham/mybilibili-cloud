@@ -1,21 +1,27 @@
 package com.mybilibili.user.component;
 
 
+import com.mybilibili.base.entity.dto.UserInteractCountDTO;
+import com.mybilibili.base.entity.dto.VideoCountDTO;
 import com.mybilibili.base.entity.query.UserInfoQuery;
+import com.mybilibili.base.entity.vo.UserCountVO;
 import com.mybilibili.base.enums.UserStatsRedisEnum;
+import com.mybilibili.user.consumer.InteractClient;
+import com.mybilibili.user.consumer.VideoInfoClient;
 import com.mybilibili.user.entity.po.UserFocus;
 import com.mybilibili.user.entity.po.UserInfo;
 import com.mybilibili.user.entity.query.UserFocusQuery;
-import com.mybilibili.user.entity.vo.UserCountVO;
 import com.mybilibili.user.mappers.UserFocusMapper;
 import com.mybilibili.user.mappers.UserInfoMapper;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 
 @Component
+@Slf4j
 public class UserStatsCacheAsyncComponent {
 
     @Resource
@@ -24,14 +30,10 @@ public class UserStatsCacheAsyncComponent {
     private UserInfoMapper<UserInfo, UserInfoQuery> userInfoMapper;
     @Resource
     private UserFocusMapper<UserFocus, UserFocusQuery> userFocusMapper;
-    //TODO 迁移至interact模块: UserVideoActionMapper
-    //TODO 接入video模块
-    // @Resource
-    // private VideoCommentMapper<VideoComment, VideoCommentQuery> videoCommentMapper;
-    // @Resource
-    // private VideoDanmuMapper<VideoDanmu, VideoDanmuQuery> videoDanmuMapper;
-    // @Resource
-    // private VideoInfoMapper<VideoInfo, VideoInfoQuery> videoInfoMapper;
+    @Resource
+    private VideoInfoClient videoInfoClient;
+    @Resource
+    private InteractClient interactClient;
 
     @Async("userStatsCacheExecutor")
     public void refreshRealtimeUserStatsCache(String userId) {
@@ -68,12 +70,7 @@ public class UserStatsCacheAsyncComponent {
         statsMap.put(UserStatsRedisEnum.USER_COIN.getField(), defaultValue(userCountVO.getCurrentCoinCount()));
         statsMap.put(UserStatsRedisEnum.VIDEO_LIKE.getField(), defaultValue(userCountVO.getLikeCount()));
         statsMap.put(UserStatsRedisEnum.VIDEO_PLAY.getField(), defaultValue(userCountVO.getPlayCount()));
-        //TODO 接入Video模块: 需要 VideoCommentMapper, VideoDanmuMapper
-        statsMap.put(UserStatsRedisEnum.USER_COMMENT_COUNT.getField(), 0);
-        statsMap.put(UserStatsRedisEnum.VIDEO_DANMU.getField(), 0);
-        //TODO 迁移至interact模块: 需要 UserVideoActionMapper.sumCoinCount / selectCount
-        statsMap.put(UserStatsRedisEnum.VIDEO_COIN.getField(), 0);
-        statsMap.put(UserStatsRedisEnum.USER_COLLECT_COUNT.getField(), 0);
+        fillInteractStats(userId, statsMap);
         return statsMap;
     }
 
@@ -88,19 +85,55 @@ public class UserStatsCacheAsyncComponent {
         UserFocusQuery fansQuery = new UserFocusQuery();
         fansQuery.setUserFocusId(userId);
         userCountVO.setFansCount(defaultValue(userFocusMapper.selectCount(fansQuery)));
-        //TODO 需要feign调用video服务
-        userCountVO.setLikeCount(0);
-        userCountVO.setPlayCount(0);
+
+        VideoCountDTO videoCountDTO = loadVideoCount(userId);
+        if (videoCountDTO == null) {
+            userCountVO.setLikeCount(0);
+            userCountVO.setPlayCount(0);
+            return userCountVO;
+        }
+        userCountVO.setLikeCount(defaultValue(videoCountDTO.getTotalLikeCount()));
+        userCountVO.setPlayCount(defaultValue(videoCountDTO.getTotalPlayCount()));
         return userCountVO;
     }
 
-    //TODO 迁移至interact模块: countVideoCollect需要UserVideoActionMapper
-    // private Integer countVideoCollect(String userId) {
-    //     UserActionQuery userActionQuery = new UserActionQuery();
-    //     userActionQuery.setVideoUserId(userId);
-    //     userActionQuery.setActionType(UserActionTypeEnum.VIDEO_COLLECT.getType());
-    //     return userVideoActionMapper.selectCount(userActionQuery);
-    // }
+    private void fillInteractStats(String userId, HashMap<String, Integer> statsMap) {
+        UserInteractCountDTO interactCountDTO = loadInteractCount(userId);
+        if (interactCountDTO == null) {
+            statsMap.put(UserStatsRedisEnum.USER_COMMENT_COUNT.getField(), 0);
+            statsMap.put(UserStatsRedisEnum.VIDEO_DANMU.getField(), 0);
+            statsMap.put(UserStatsRedisEnum.VIDEO_COIN.getField(), 0);
+            statsMap.put(UserStatsRedisEnum.USER_COLLECT_COUNT.getField(), 0);
+            return;
+        }
+
+        // interact 只返回用户作为 UP 主收到的互动数，这里统一写入 user 实时统计缓存。
+        statsMap.put(UserStatsRedisEnum.USER_COMMENT_COUNT.getField(), defaultValue(interactCountDTO.getCommentCount()));
+        statsMap.put(UserStatsRedisEnum.VIDEO_DANMU.getField(), defaultValue(interactCountDTO.getDanmuCount()));
+        statsMap.put(UserStatsRedisEnum.VIDEO_COIN.getField(), defaultValue(interactCountDTO.getCoinCount()));
+        statsMap.put(UserStatsRedisEnum.USER_COLLECT_COUNT.getField(), defaultValue(interactCountDTO.getCollectCount()));
+    }
+
+    private VideoCountDTO loadVideoCount(String userId) {
+        try {
+            // 视频统计归 video 服务维护，user 冷启动缓存时只通过 Feign 拉取汇总结果。
+            return videoInfoClient.countVideoInfoByUserId(userId);
+        } catch (Exception e) {
+            // 统计缓存是展示型数据，远程服务短暂异常时降级为 0，避免影响用户主页主流程。
+            log.warn("查询用户视频统计失败，userId:{}", userId, e);
+            return null;
+        }
+    }
+
+    private UserInteractCountDTO loadInteractCount(String userId) {
+        try {
+            return interactClient.countUserInteractByUserId(userId);
+        } catch (Exception e) {
+            // 评论、弹幕等统计也按展示数据处理，失败后下一次缓存刷新会重新拉取。
+            log.warn("查询用户互动统计失败，userId:{}", userId, e);
+            return null;
+        }
+    }
 
     private Integer defaultValue(Integer value) {
         return value == null ? 0 : value;

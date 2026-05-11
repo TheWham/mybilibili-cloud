@@ -3,6 +3,7 @@ package com.mybilibili.interact.services.impl;
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
 import com.mybilibili.base.entity.dto.UserInfoDTO;
+import com.mybilibili.base.entity.dto.VideoInfoDTO;
 import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.query.UserActionQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
@@ -99,9 +100,17 @@ public class VideoCommentServiceImpl implements VideoCommentService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void postComment(VideoComment videoComment) {
-        // TODO 后续改为调用 video 服务内部接口校验视频是否存在、评论区是否开启，并取得 UP 主 userId。
-        // 当前不能信任前端传 videoUserId，否则评论归属和删除权限都会出错，所以先明确阻断写入。
-        throw new BusinessException("评论发布依赖 video 服务返回 UP 主信息，后续接入 Feign 后开放");
+        VideoInfoDTO videoInfo = getVideoInfo(videoComment.getVideoId());
+        if (!checkCommentOpen(videoComment.getVideoId())) {
+            throw new BusinessException("评论区已关闭");
+        }
+
+        // 视频作者必须以后端查询结果为准，避免前端伪造 videoUserId 影响归属和删除权限。
+        videoComment.setVideoUserId(videoInfo.getUserId());
+        fillReplyCommentInfo(videoComment);
+        videoComment.setLikeCount(defaultValue(videoComment.getLikeCount()));
+        videoComment.setHateCount(defaultValue(videoComment.getHateCount()));
+        add(videoComment);
     }
 
     @Override
@@ -158,7 +167,6 @@ public class VideoCommentServiceImpl implements VideoCommentService {
 
     @Override
     public List<VideoComment> loadCommentUCenter(VideoCommentQuery videoCommentQuery) {
-        // TODO 后续改为调用 video 服务批量补齐 videoName、videoCover。
         return videoCommentMapper.selectList(videoCommentQuery);
     }
 
@@ -168,12 +176,34 @@ public class VideoCommentServiceImpl implements VideoCommentService {
         VideoComment videoComment = Optional.ofNullable(videoCommentMapper.selectByCommentId(commentId))
                 .orElseThrow(() -> new BusinessException(ResponseCodeEnum.CODE_600));
 
-        // TODO 后续调用 video 服务查询 UP 主信息后，补回“UP 主可删除自己视频下评论”的权限。
-        boolean canDirectDelete = Boolean.TRUE.equals(isAdmin) || videoComment.getUserId().equals(userId);
+        boolean canDirectDelete = Boolean.TRUE.equals(isAdmin)
+                || videoComment.getUserId().equals(userId)
+                || isVideoOwner(videoComment.getVideoId(), userId);
         if (!canDirectDelete) {
             throw new BusinessException(ResponseCodeEnum.CODE_600);
         }
         return videoCommentMapper.deleteByCommentId(commentId);
+    }
+
+    private void fillReplyCommentInfo(VideoComment videoComment) {
+        Integer replyCommentId = videoComment.getReplyCommentId();
+        if (replyCommentId == null || Constants.ZERO.equals(replyCommentId)) {
+            videoComment.setPCommentId(Constants.ZERO);
+            return;
+        }
+
+        VideoComment replyComment = Optional.ofNullable(videoCommentMapper.selectByCommentId(replyCommentId))
+                .orElseThrow(() -> new BusinessException(ResponseCodeEnum.CODE_600));
+        if (!videoComment.getVideoId().equals(replyComment.getVideoId())) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600);
+        }
+
+        // 回复子评论时仍挂在一级评论下面，replyUserId 记录真正被回复的人。
+        Integer replyParentId = replyComment.getPCommentId();
+        videoComment.setPCommentId(replyParentId == null || Constants.ZERO.equals(replyParentId)
+                ? replyComment.getCommentId()
+                : replyParentId);
+        videoComment.setReplyUserId(replyComment.getUserId());
     }
 
     private List<VideoComment> getTopComment(String videoId) {
@@ -198,6 +228,19 @@ public class VideoCommentServiceImpl implements VideoCommentService {
             LOGGER.warn("查询视频评论区状态失败，videoId:{}", videoId, e);
             throw new BusinessException(ResponseCodeEnum.CODE_600);
         }
+    }
+
+    private boolean isVideoOwner(String videoId, String userId) {
+        if (videoId == null || userId == null) {
+            return false;
+        }
+        VideoInfoDTO videoInfo = getVideoInfo(videoId);
+        return userId.equals(videoInfo.getUserId());
+    }
+
+    private VideoInfoDTO getVideoInfo(String videoId) {
+        return Optional.ofNullable(videoInfoClient.getVideoInfoByVideoId(videoId))
+                .orElseThrow(() -> new BusinessException(ResponseCodeEnum.CODE_600));
     }
 
     /**
@@ -287,5 +330,9 @@ public class VideoCommentServiceImpl implements VideoCommentService {
         if (userId != null && !userId.isBlank()) {
             userIds.add(userId);
         }
+    }
+
+    private Integer defaultValue(Integer value) {
+        return value == null ? 0 : value;
     }
 }

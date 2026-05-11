@@ -1,11 +1,12 @@
 package com.mybilibili.ai.service.impl;
 
-import com.mybilibili.ai.config.AiProperties;
-import com.mybilibili.ai.entity.vo.AiMatchedVideoVO;
-import com.mybilibili.base.exception.BusinessException;
-import com.mybilibili.ai.service.AiSubtitleVectorService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mybilibili.ai.config.AiProperties;
+import com.mybilibili.ai.constants.AiConstants;
+import com.mybilibili.ai.entity.vo.AiMatchedVideoVO;
+import com.mybilibili.ai.service.AiSubtitleVectorService;
+import com.mybilibili.base.exception.BusinessException;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.entity.ContentType;
@@ -19,16 +20,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service("aiSubtitleVectorService")
 public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
 
-    private static final double ES_COSINE_SCORE_OFFSET = 1.0D;
-    private static final String MATCH_TYPE_SUBTITLE = "subtitle";
-    private static final String MATCH_TYPE_TITLE = "title";
-    private static final List<String> SOURCE_FIELDS = Arrays.asList(
+    private static final String HTTP_METHOD_POST = "POST";
+    private static final int HTTP_STATUS_NOT_FOUND = 404;
+    private static final List<String> SOURCE_FIELDS = List.of(
             "videoId", "videoName", "videoCover", "content", "startTime", "endTime"
     );
 
@@ -74,16 +78,16 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
         if (queryVector == null || queryVector.isEmpty()) {
             return new ArrayList<>();
         }
-        int candidateSize = Math.max(limit * 3, limit);
+        int candidateSize = resolveCandidateSize(limit);
 
         try {
-            Request request = new Request("POST", "/" + aiProperties.getEs().getSubtitleVectorIndexName() + "/_search");
+            Request request = new Request(HTTP_METHOD_POST, buildEsPath(AiConstants.ES_SEARCH_PATH));
             request.setEntity(new StringEntity(objectMapper.writeValueAsString(buildSearchBody(queryVector, candidateSize)), ContentType.APPLICATION_JSON));
             Response response = restClient.performRequest(request);
             String responseJson = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
             return parseSearchResponse(responseJson, limit, minScore == null ? aiProperties.getRag().getMinScore() : minScore);
         } catch (ResponseException e) {
-            if (e.getResponse() != null && e.getResponse().getStatusLine().getStatusCode() == 404) {
+            if (isIndexNotFound(e)) {
                 log.warn("字幕向量索引不存在, index={}", aiProperties.getEs().getSubtitleVectorIndexName());
                 return new ArrayList<>();
             }
@@ -97,13 +101,13 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
 
     private List<AiMatchedVideoVO> searchBySubtitleKeyword(String keyword, int limit) {
         try {
-            Request request = new Request("POST", "/" + aiProperties.getEs().getSubtitleVectorIndexName() + "/_search");
-            request.setEntity(new StringEntity(objectMapper.writeValueAsString(buildSubtitleKeywordSearchBody(keyword, Math.max(limit * 3, limit))), ContentType.APPLICATION_JSON));
+            Request request = new Request(HTTP_METHOD_POST, buildEsPath(AiConstants.ES_SEARCH_PATH));
+            request.setEntity(new StringEntity(objectMapper.writeValueAsString(buildSubtitleKeywordSearchBody(keyword, resolveCandidateSize(limit))), ContentType.APPLICATION_JSON));
             Response response = restClient.performRequest(request);
             String responseJson = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
             return parseKeywordSearchResponse(responseJson, limit);
         } catch (ResponseException e) {
-            if (e.getResponse() != null && e.getResponse().getStatusLine().getStatusCode() == 404) {
+            if (isIndexNotFound(e)) {
                 log.warn("字幕向量索引不存在, index={}", aiProperties.getEs().getSubtitleVectorIndexName());
                 return new ArrayList<>();
             }
@@ -117,13 +121,13 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
 
     private List<AiMatchedVideoVO> searchByTitleKeyword(String keyword, int limit) {
         try {
-            Request request = new Request("POST", "/" + aiProperties.getEs().getSubtitleVectorIndexName() + "/_search");
-            request.setEntity(new StringEntity(objectMapper.writeValueAsString(buildTitleKeywordSearchBody(keyword, Math.max(limit * 3, limit))), ContentType.APPLICATION_JSON));
+            Request request = new Request(HTTP_METHOD_POST, buildEsPath(AiConstants.ES_SEARCH_PATH));
+            request.setEntity(new StringEntity(objectMapper.writeValueAsString(buildTitleKeywordSearchBody(keyword, resolveCandidateSize(limit))), ContentType.APPLICATION_JSON));
             Response response = restClient.performRequest(request);
             String responseJson = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
             return parseTitleSearchResponse(responseJson, limit);
         } catch (ResponseException e) {
-            if (e.getResponse() != null && e.getResponse().getStatusLine().getStatusCode() == 404) {
+            if (isIndexNotFound(e)) {
                 log.warn("字幕向量索引不存在, index={}", aiProperties.getEs().getSubtitleVectorIndexName());
                 return new ArrayList<>();
             }
@@ -141,12 +145,12 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
             return;
         }
         try {
-            Request request = new Request("POST", "/" + aiProperties.getEs().getSubtitleVectorIndexName() + "/_delete_by_query");
-            request.addParameter("conflicts", "proceed");
+            Request request = new Request(HTTP_METHOD_POST, buildEsPath(AiConstants.ES_DELETE_BY_QUERY_PATH));
+            request.addParameter(AiConstants.ES_CONFLICTS_PARAM, AiConstants.ES_CONFLICTS_PROCEED);
             request.setEntity(new StringEntity(objectMapper.writeValueAsString(buildDeleteBody(videoId)), ContentType.APPLICATION_JSON));
             restClient.performRequest(request);
         } catch (ResponseException e) {
-            if (e.getResponse() != null && e.getResponse().getStatusLine().getStatusCode() == 404) {
+            if (isIndexNotFound(e)) {
                 return;
             }
             throw new BusinessException("删除视频字幕向量失败", e);
@@ -161,7 +165,8 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
 
         Map<String, Object> script = new LinkedHashMap<>();
         // ES 的 script_score 不接受负分，所以把 cosine 分数整体 +1，解析结果时再减回来。
-        script.put("source", "cosineSimilarity(params.queryVector, 'contentVector') + 1.0");
+        script.put("source", "cosineSimilarity(params.queryVector, '" + AiConstants.ES_CONTENT_VECTOR_FIELD
+                + "') + " + AiConstants.ES_COSINE_SCORE_OFFSET);
         script.put("params", params);
 
         Map<String, Object> scriptScore = new LinkedHashMap<>();
@@ -179,12 +184,12 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
         List<Map<String, Object>> shouldQueries = new ArrayList<>();
         shouldQueries.add(Map.of(
                 "match_phrase", Map.of(
-                        "content", Map.of("query", keyword, "boost", 5)
+                        "content", Map.of("query", keyword, "boost", aiProperties.getSearch().getSubtitlePhraseBoost())
                 )
         ));
         shouldQueries.add(Map.of(
                 "match", Map.of(
-                        "content", Map.of("query", keyword, "operator", "and", "boost", 2)
+                        "content", Map.of("query", keyword, "operator", "and", "boost", aiProperties.getSearch().getSubtitleAndBoost())
                 )
         ));
         shouldQueries.add(Map.of(
@@ -210,12 +215,12 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
         List<Map<String, Object>> shouldQueries = new ArrayList<>();
         shouldQueries.add(Map.of(
                 "match_phrase", Map.of(
-                        "videoName", Map.of("query", keyword, "boost", 5)
+                        "videoName", Map.of("query", keyword, "boost", aiProperties.getSearch().getTitlePhraseBoost())
                 )
         ));
         shouldQueries.add(Map.of(
                 "match", Map.of(
-                        "videoName", Map.of("query", keyword, "operator", "and", "boost", 2)
+                        "videoName", Map.of("query", keyword, "operator", "and", "boost", aiProperties.getSearch().getTitleAndBoost())
                 )
         ));
 
@@ -245,7 +250,7 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
         JsonNode hits = objectMapper.readTree(responseJson).path("hits").path("hits");
         Map<String, AiMatchedVideoVO> videoMap = new LinkedHashMap<>();
         for (JsonNode hit : hits) {
-            double cosineScore = hit.path("_score").asDouble(0D) - ES_COSINE_SCORE_OFFSET;
+            double cosineScore = hit.path("_score").asDouble(0D) - AiConstants.ES_COSINE_SCORE_OFFSET;
             if (cosineScore < minScore) {
                 continue;
             }
@@ -263,7 +268,7 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
             matchedVideo.setStartTime(source.path("startTime").asDouble(0D));
             matchedVideo.setEndTime(source.path("endTime").asDouble(0D));
             matchedVideo.setScore(roundScore(cosineScore));
-            matchedVideo.setMatchType(MATCH_TYPE_SUBTITLE);
+            matchedVideo.setMatchType(AiConstants.MATCH_TYPE_SUBTITLE);
             videoMap.put(videoId, matchedVideo);
 
             if (videoMap.size() >= limit) {
@@ -285,7 +290,7 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
 
             AiMatchedVideoVO matchedVideo = buildMatchedVideo(source);
             matchedVideo.setScore(normalizeKeywordScore(hit.path("_score").asDouble(0D)));
-            matchedVideo.setMatchType(MATCH_TYPE_SUBTITLE);
+            matchedVideo.setMatchType(AiConstants.MATCH_TYPE_SUBTITLE);
             videoMap.put(videoId, matchedVideo);
 
             if (videoMap.size() >= limit) {
@@ -315,7 +320,7 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
             matchedVideo.setStartTime(null);
             matchedVideo.setEndTime(null);
             matchedVideo.setScore(normalizeTitleScore(hit.path("_score").asDouble(0D), maxScore));
-            matchedVideo.setMatchType(MATCH_TYPE_TITLE);
+            matchedVideo.setMatchType(AiConstants.MATCH_TYPE_TITLE);
             videoMap.put(videoId, matchedVideo);
 
             if (videoMap.size() >= limit) {
@@ -354,7 +359,7 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
         if (score <= 0) {
             return 0D;
         }
-        return roundScore(Math.min(score / 10D, 1D));
+        return roundScore(Math.min(score / aiProperties.getSearch().getKeywordScoreDivisor(), 1D));
     }
 
     private double normalizeTitleScore(double score, double maxScore) {
@@ -362,11 +367,24 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
             return 0D;
         }
         // 标题命中只是“相关视频”证据，分数不和字幕向量分数直接竞争，避免看起来像字幕高度匹配。
-        return roundScore(Math.min(0.7D, Math.max(0.4D, score / maxScore * 0.7D)));
+        double titleScoreMax = aiProperties.getSearch().getTitleScoreMax();
+        return roundScore(Math.min(titleScoreMax, Math.max(aiProperties.getSearch().getTitleScoreMin(), score / maxScore * titleScoreMax)));
     }
 
     private double roundScore(double score) {
-        return Math.round(score * 10000D) / 10000D;
+        return Math.round(score * AiConstants.SCORE_SCALE) / AiConstants.SCORE_SCALE;
+    }
+
+    private int resolveCandidateSize(int limit) {
+        return Math.max(limit * aiProperties.getSearch().getCandidateMultiplier(), limit);
+    }
+
+    private String buildEsPath(String actionPath) {
+        return "/" + aiProperties.getEs().getSubtitleVectorIndexName() + "/" + actionPath;
+    }
+
+    private boolean isIndexNotFound(ResponseException e) {
+        return e.getResponse() != null && e.getResponse().getStatusLine().getStatusCode() == HTTP_STATUS_NOT_FOUND;
     }
 }
 

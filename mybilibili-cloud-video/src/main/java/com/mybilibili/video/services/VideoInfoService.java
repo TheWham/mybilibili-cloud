@@ -1,7 +1,7 @@
 package com.mybilibili.video.services;
 
 import com.mybilibili.base.entity.vo.PaginationResultVO;
-import com.mybilibili.video.entity.dto.VideoCountDTO;
+import com.mybilibili.base.entity.dto.VideoCountDTO;
 import com.mybilibili.video.entity.dto.VideoCountUpdateDTO;
 import com.mybilibili.video.entity.po.VideoInfo;
 import com.mybilibili.video.entity.query.VideoInfoQuery;

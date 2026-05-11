@@ -4,8 +4,11 @@ import cn.hutool.core.bean.BeanUtil;
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.AiSubtitleIndexTaskDTO;
 import com.mybilibili.base.entity.dto.SysSettingDTO;
+import com.mybilibili.base.entity.dto.VideoCountDTO;
+import com.mybilibili.base.entity.dto.VideoInfoDTO;
 import com.mybilibili.base.entity.query.UserActionQuery;
 import com.mybilibili.base.entity.vo.UserActionVO;
+import com.mybilibili.video.consumer.SearchVideoClient;
 import com.mybilibili.video.consumer.UserVideoActionClient;
 import com.mybilibili.video.entity.po.VideoInfo;
 import com.mybilibili.video.entity.po.VideoInfoFile;
@@ -22,7 +25,6 @@ import com.mybilibili.base.enums.VideoStatusEnum;
 import com.mybilibili.base.exception.BusinessException;
 import com.mybilibili.common.config.AdminConfig;
 import com.mybilibili.video.component.VideoRedisComponent;
-import com.mybilibili.video.entity.dto.VideoCountDTO;
 import com.mybilibili.video.entity.dto.VideoCountUpdateDTO;
 import com.mybilibili.video.entity.query.VideoInfoFilePostQuery;
 import com.mybilibili.video.entity.query.VideoInfoFileQuery;
@@ -33,8 +35,7 @@ import com.mybilibili.video.mappers.VideoInfoFileMapper;
 import com.mybilibili.video.mappers.VideoInfoFilePostMapper;
 import com.mybilibili.video.mappers.VideoInfoMapper;
 import com.mybilibili.video.mappers.VideoInfoPostMapper;
-import com.mybilibili.video.services.AiSubtitleVectorService;
-import com.mybilibili.video.services.VideoEsService;
+import com.mybilibili.video.consumer.AiSubtitleVectorClient;
 import com.mybilibili.video.services.VideoInfoService;
 import jakarta.annotation.Resource;
 import org.apache.commons.io.FileUtils;
@@ -72,9 +73,9 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 	@Resource
 	private AdminConfig adminConfig;
 	@Resource
-	private VideoEsService videoEsService;
+	private SearchVideoClient searchVideoClient;
 	@Resource
-	private AiSubtitleVectorService aiSubtitleVectorService;
+	private AiSubtitleVectorClient aiSubtitleVectorClient;
 
 	@Resource
 	private UserVideoActionClient userVideoActionClient;
@@ -231,8 +232,8 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 
 		//清空缓存
 		videoRedisComponent.cleanDelFilePaths(videoId);
-		//保存到es
-		videoEsService.saveDoc(videoInfo);
+		// 正式表写完后，把搜索索引交给 search 服务维护，video 不再直接操作 ES。
+		searchVideoClient.saveVideoDoc(BeanUtil.toBean(videoInfo, VideoInfoDTO.class));
 		enqueueAiSubtitleIndexTasks(videoInfo, filePostList);
 	}
 
@@ -402,7 +403,7 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 			return;
 		}
 		try {
-			aiSubtitleVectorService.deleteByVideoId(videoInfo.getVideoId());
+			aiSubtitleVectorClient.deleteByVideoId(videoInfo.getVideoId());
 			int taskCount = 0;
 			for (VideoInfoFilePost filePost : filePostList) {
 				String sourceVideoPath = adminConfig.getProjectFolder()
