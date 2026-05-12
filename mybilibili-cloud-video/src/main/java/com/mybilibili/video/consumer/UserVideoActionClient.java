@@ -8,6 +8,7 @@ import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.entity.vo.UserActionVO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -21,6 +22,6 @@ public interface UserVideoActionClient {
                                                                      @RequestParam("userId") String userId);
 
 
-    @GetMapping(Constants.INNER_API_PREFIX + "getUserActionTypeList")
+    @PostMapping(Constants.INNER_API_PREFIX + "/getUserActionTypeList")
     List<UserActionVO> getUserActionTypeList(@RequestBody UserActionQuery userActionQuery);
 }

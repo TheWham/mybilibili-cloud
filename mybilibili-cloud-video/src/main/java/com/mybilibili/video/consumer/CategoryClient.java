@@ -2,7 +2,7 @@ package com.mybilibili.video.consumer;
 
 
 import com.mybilibili.base.constants.Constants;
-import com.mybilibili.video.entity.po.CategoryInfo;
+import com.mybilibili.base.entity.dto.CategoryInfoVO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 
@@ -24,5 +24,5 @@ public interface CategoryClient {
      * @return 分类树或分类列表，具体结构以 admin 服务返回值为准
      */
     @GetMapping(Constants.INNER_API_PREFIX + "/loadAllCategory")
-    List<CategoryInfo> loadAllCategory();
+    List<CategoryInfoVO> loadAllCategory();
 }

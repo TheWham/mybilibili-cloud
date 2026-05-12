@@ -63,7 +63,7 @@ public class InteractRedisComponent {
         long statsTtl = (long) Constants.REDIS_EXPIRE_TIME_ONE_DAY * Constants.REDIS_USER_STATS_CACHE_TTL_DAYS;
         long actionStatusTtl = (long) Constants.REDIS_EXPIRE_TIME_ONE_MINUTE * Constants.REDIS_ACTION_STATUS_CACHE_TTL_MINUTES;
 
-        return redisUtils.executeLongScript(
+        return redisUtils.executeLongScriptWithStringArgs(
                 InteractRedisKeys.LUA_VIDEO_TOGGLE_ACTION,
                 Arrays.asList(actionStatusKey, ownerStatsKey),
                 statsField,
@@ -79,7 +79,7 @@ public class InteractRedisComponent {
         String receiverStatsKey = InteractRedisKeys.USER_STATS_KEY + videoUserId;
         long statsTtl = (long) Constants.REDIS_EXPIRE_TIME_ONE_DAY * Constants.REDIS_USER_STATS_CACHE_TTL_DAYS;
 
-        return redisUtils.executeLongScript(
+        return redisUtils.executeLongScriptWithStringArgs(
                 InteractRedisKeys.LUA_VIDEO_COIN,
                 Arrays.asList(actionStatusKey, senderStatsKey, receiverStatsKey),
                 UserStatsRedisEnum.USER_COIN.getField(),

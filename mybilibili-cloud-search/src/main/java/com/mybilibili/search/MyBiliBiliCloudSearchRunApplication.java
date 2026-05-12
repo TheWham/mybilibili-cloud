@@ -1,9 +1,17 @@
 package com.mybilibili.search;
 
+import com.mybilibili.common.component.TokenRedisComponent;
+import com.mybilibili.common.config.AdminConfig;
+import com.mybilibili.common.config.ElasticSearchConfig;
+import com.mybilibili.common.utils.FFmpegUtils;
+import org.mybatis.spring.boot.autoconfigure.MybatisAutoConfiguration;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Import;
 
 /**
  * 搜索服务启动入口。
@@ -14,7 +22,19 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  */
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = {"com.mybilibili.search", "com.mybilibili.common"})
-@SpringBootApplication(scanBasePackages = {"com.mybilibili.search", "com.mybilibili.common"})
+@SpringBootApplication(scanBasePackages = {"com.mybilibili.search", "com.mybilibili.common"}, exclude = {DataSourceAutoConfiguration.class, MybatisAutoConfiguration.class})
+@ComponentScan(basePackages = {
+        "com.mybilibili.search",
+        "com.mybilibili.common.aspect",
+        "com.mybilibili.common.controller",
+        "com.mybilibili.common.redis"
+})
+@Import({
+        TokenRedisComponent.class,
+        AdminConfig.class,
+        ElasticSearchConfig.class,
+        FFmpegUtils.class
+})
 public class MyBiliBiliCloudSearchRunApplication {
 
     public static void main(String[] args) {

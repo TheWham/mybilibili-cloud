@@ -308,6 +308,7 @@ public class VideoInfoEsServiceImpl implements VideoEsService {
         putIfNotBlank(updateMap, "userId", videoInfoEsDTO.getUserId());
         putIfNotBlank(updateMap, "tags", videoInfoEsDTO.getTags());
         putIfNotNull(updateMap, "createTime", videoInfoEsDTO.getCreateTime());
+        putIfNotNull(updateMap, "duration", videoInfoEsDTO.getDuration());
         putIfNotNull(updateMap, "playCount", videoInfoEsDTO.getPlayCount());
         putIfNotNull(updateMap, "danmuCount", videoInfoEsDTO.getDanmuCount());
         putIfNotNull(updateMap, "collectCount", videoInfoEsDTO.getCollectCount());

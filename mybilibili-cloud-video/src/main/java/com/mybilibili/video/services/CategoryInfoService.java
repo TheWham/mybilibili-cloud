@@ -1,10 +1,10 @@
 package com.mybilibili.video.services;
 
 
-
-import com.mybilibili.video.entity.po.CategoryInfo;
+import com.mybilibili.base.entity.dto.CategoryInfoVO;
 import com.mybilibili.base.entity.query.CategoryInfoQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
+import com.mybilibili.video.entity.po.CategoryInfo;
 
 import java.util.List;
 
@@ -90,5 +90,5 @@ public interface CategoryInfoService {
 	/**
 	 * 从 admin 服务读取前台可用的分类数据。
 	 */
-	List<CategoryInfo> loadAllCategoryFromAdmin();
+	List<CategoryInfoVO> loadAllCategoryFromAdmin();
 }

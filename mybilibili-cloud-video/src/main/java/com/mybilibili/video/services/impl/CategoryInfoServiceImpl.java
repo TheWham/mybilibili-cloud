@@ -1,13 +1,14 @@
 package com.mybilibili.video.services.impl;
 
 import com.mybilibili.base.constants.Constants;
-import com.mybilibili.video.entity.po.CategoryInfo;
+import com.mybilibili.base.entity.dto.CategoryInfoVO;
 import com.mybilibili.base.entity.query.CategoryInfoQuery;
 import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.exception.BusinessException;
 import com.mybilibili.video.consumer.CategoryClient;
+import com.mybilibili.video.entity.po.CategoryInfo;
 import com.mybilibili.video.mappers.CategoryInfoMapper;
 import com.mybilibili.video.services.CategoryInfoService;
 import jakarta.annotation.Resource;
@@ -209,7 +210,7 @@ public class CategoryInfoServiceImpl implements CategoryInfoService {
 	}
 
 	@Override
-	public List<CategoryInfo> loadAllCategoryFromAdmin() {
+	public List<CategoryInfoVO> loadAllCategoryFromAdmin() {
 		return categoryClient.loadAllCategory();
 	}
 

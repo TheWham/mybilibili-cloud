@@ -36,6 +36,7 @@ import com.mybilibili.video.mappers.VideoInfoFilePostMapper;
 import com.mybilibili.video.mappers.VideoInfoMapper;
 import com.mybilibili.video.mappers.VideoInfoPostMapper;
 import com.mybilibili.video.consumer.AiSubtitleVectorClient;
+import com.mybilibili.video.mq.producer.UserMessageEventProducer;
 import com.mybilibili.video.services.VideoInfoService;
 import jakarta.annotation.Resource;
 import org.apache.commons.io.FileUtils;
@@ -79,6 +80,8 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 
 	@Resource
 	private UserVideoActionClient userVideoActionClient;
+	@Resource
+	private UserMessageEventProducer userMessageEventProducer;
 
 	/**
 	 * @description 根据条件查询
@@ -175,6 +178,7 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 
 		if (status.equals(VideoStatusEnum.STATUS_4.getStatus()))
 		{
+			userMessageEventProducer.sendAuditVideoMessage(videoInfoPost, status, reason);
 			return;
 		}
 
@@ -235,6 +239,7 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 		// 正式表写完后，把搜索索引交给 search 服务维护，video 不再直接操作 ES。
 		searchVideoClient.saveVideoDoc(BeanUtil.toBean(videoInfo, VideoInfoDTO.class));
 		enqueueAiSubtitleIndexTasks(videoInfo, filePostList);
+		userMessageEventProducer.sendAuditVideoMessage(videoInfoPost, status, reason);
 	}
 
 	@Override

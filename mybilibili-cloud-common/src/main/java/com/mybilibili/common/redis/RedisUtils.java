@@ -6,8 +6,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.FileCopyUtils;
@@ -25,6 +27,8 @@ public class RedisUtils<V> {
 
     @Resource
     private RedisTemplate<String, V> redisTemplate;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     private static final Logger logger = LoggerFactory.getLogger(RedisUtils.class);
     private static final Map<String, DefaultRedisScript<Long>> LUA_SCRIPT_CACHE = new ConcurrentHashMap<>();
@@ -352,6 +356,28 @@ public class RedisUtils<V> {
         }
     }
 
+    /**
+     * Lua 参数里只要出现 Hash field 名称，就不能走 JSON 序列化。
+     * 否则 "currentCoinCount" 这类字段会被序列化成带引号的字符串，
+     * 脚本里的 HGET/HINCRBY 会把它当成另一个 field，最终读到 0。
+     *
+     * @param scriptPath 脚本路径
+     * @param keys Redis key 列表
+     * @param args Lua ARGV 参数，统一按字符串序列化
+     * @return 脚本返回值
+     */
+    public Long executeLongScriptWithStringArgs(String scriptPath, List<String> keys, Object... args) {
+        try {
+            DefaultRedisScript<Long> redisScript = LUA_SCRIPT_CACHE.computeIfAbsent(scriptPath, this::buildLongRedisScript);
+            RedisSerializer<String> stringSerializer = RedisSerializer.string();
+            Long result = stringRedisTemplate.execute(redisScript, stringSerializer, null, keys, convertArgsToString(args));
+            return result == null ? 0L : result;
+        } catch (Exception e) {
+            logger.error("执行 Redis Lua 脚本失败(字符串参数), scriptPath: {}, keys: {}", scriptPath, keys, e);
+            return null;
+        }
+    }
+
     private DefaultRedisScript<Long> buildLongRedisScript(String scriptPath) {
         try {
             ClassPathResource resource = new ClassPathResource(scriptPath);
@@ -363,6 +389,17 @@ public class RedisUtils<V> {
         } catch (Exception e) {
             throw new IllegalStateException("加载 Lua 脚本失败: " + scriptPath, e);
         }
+    }
+
+    private String[] convertArgsToString(Object... args) {
+        if (args == null || args.length == 0) {
+            return new String[0];
+        }
+        String[] result = new String[args.length];
+        for (int i = 0; i < args.length; i++) {
+            result[i] = args[i] == null ? null : String.valueOf(args[i]);
+        }
+        return result;
     }
 
     // ============================ Pipeline (流水线) 相关操作 ============================

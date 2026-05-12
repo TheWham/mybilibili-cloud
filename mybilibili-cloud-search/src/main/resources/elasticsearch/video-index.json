@@ -31,6 +31,10 @@
         "type": "text",
         "analyzer": "comma"
       },
+      "duration": {
+        "type": "integer",
+        "index": false
+      },
       "playCount": {
         "type": "integer",
         "index": false

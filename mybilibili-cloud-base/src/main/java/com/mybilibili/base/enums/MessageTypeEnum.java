@@ -1,7 +1,12 @@
-package com.mybilibili.message.enums;
+package com.mybilibili.base.enums;
 
 /**
- * 用户消息类型。
+ * 用户站内信类型。
+ *
+ * <p>消息类型会在多个服务之间传递，枚举放在 base 里避免各服务各自维护一份。</p>
+ *
+ * @author amani
+ * @since 2026/05/13
  */
 public enum MessageTypeEnum {
 
@@ -18,11 +23,12 @@ public enum MessageTypeEnum {
         this.desc = desc;
     }
 
-    public static MessageTypeEnum getEnum(Integer type)
-    {
-        for (MessageTypeEnum messageTypeEnum : MessageTypeEnum.values())
-            if (messageTypeEnum.getType().equals(type))
+    public static MessageTypeEnum getEnum(Integer type) {
+        for (MessageTypeEnum messageTypeEnum : MessageTypeEnum.values()) {
+            if (messageTypeEnum.getType().equals(type)) {
                 return messageTypeEnum;
+            }
+        }
         return null;
     }
 

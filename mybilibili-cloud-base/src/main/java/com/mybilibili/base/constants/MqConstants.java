@@ -63,4 +63,19 @@ public final class MqConstants {
      * 用户硬币计数路由键。
      */
     public static final String USER_COIN_SYNC_ROUTING_KEY = "user.coin.sync";
+
+    /**
+     * 用户站内信事件交换机。
+     */
+    public static final String USER_MESSAGE_EXCHANGE = "mybilibili.user.message.exchange";
+
+    /**
+     * 用户站内信落库队列，由 message 服务消费。
+     */
+    public static final String USER_MESSAGE_PERSIST_QUEUE = "mybilibili.user.message.persist.queue";
+
+    /**
+     * 用户站内信落库路由键。
+     */
+    public static final String USER_MESSAGE_PERSIST_ROUTING_KEY = "user.message.persist";
 }

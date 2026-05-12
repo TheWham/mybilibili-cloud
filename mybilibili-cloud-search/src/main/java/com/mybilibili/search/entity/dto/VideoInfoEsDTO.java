@@ -1,12 +1,22 @@
 package com.mybilibili.search.entity.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
 import java.util.Date;
 
+/**
+ * 视频搜索索引文档。
+ *
+ * <p>ES 中可能存在历史版本写入的扩展字段，搜索页不依赖这些字段时不应该影响查询主流程。</p>
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class VideoInfoEsDTO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
     /**
      * 视频ID
      */
@@ -40,19 +50,14 @@ public class VideoInfoEsDTO implements Serializable {
     private String tags;
 
     /**
+     * 视频时长，单位：秒。
+     */
+    private Integer duration;
+
+    /**
      * 播放数量
      */
     private Integer playCount;
-
-//    /**
-//     * 点赞数量
-//     */
-//    privat1e Integer likeCount;
-//
-//    /**
-//     * 投币数量
-//     */
-//    private Integer coinCount;
 
     /**
      * 弹幕数量
@@ -114,6 +119,14 @@ public class VideoInfoEsDTO implements Serializable {
         this.tags = tags;
     }
 
+
+    public Integer getDuration() {
+        return duration;
+    }
+
+    public void setDuration(Integer duration) {
+        this.duration = duration;
+    }
 
     public Integer getPlayCount() {
         return playCount;

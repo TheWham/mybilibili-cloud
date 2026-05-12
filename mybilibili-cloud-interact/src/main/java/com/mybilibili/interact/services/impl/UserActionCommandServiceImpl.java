@@ -4,6 +4,7 @@ import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.UserInfoDTO;
 import com.mybilibili.base.entity.dto.VideoInfoDTO;
 import com.mybilibili.base.entity.event.UserActionSyncEvent;
+import com.mybilibili.base.entity.query.UserActionQuery;
 import com.mybilibili.base.enums.ResponseCodeEnum;
 import com.mybilibili.base.enums.UserActionTypeEnum;
 import com.mybilibili.base.enums.UserStatsRedisEnum;
@@ -12,10 +13,16 @@ import com.mybilibili.interact.component.InteractRedisComponent;
 import com.mybilibili.interact.consumer.UserInfoClient;
 import com.mybilibili.interact.consumer.VideoInfoClient;
 import com.mybilibili.interact.entity.dto.UserActionDTO;
+import com.mybilibili.interact.entity.po.UserCommentAction;
+import com.mybilibili.interact.entity.po.VideoComment;
+import com.mybilibili.interact.mappers.UserCommentActionMapper;
+import com.mybilibili.interact.mappers.VideoCommentMapper;
 import com.mybilibili.interact.mq.producer.UserActionEventProducer;
+import com.mybilibili.interact.mq.producer.UserMessageEventProducer;
 import com.mybilibili.interact.services.UserActionCommandService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
@@ -48,8 +55,15 @@ public class UserActionCommandServiceImpl implements UserActionCommandService {
     private InteractRedisComponent interactRedisComponent;
     @Resource
     private UserActionEventProducer userActionEventProducer;
+    @Resource
+    private UserMessageEventProducer userMessageEventProducer;
+    @Resource
+    private VideoCommentMapper<VideoComment, UserActionQuery> videoCommentMapper;
+    @Resource
+    private UserCommentActionMapper<UserCommentAction, UserActionQuery> userCommentActionMapper;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void doAction(UserActionDTO userActionDTO, String userId) {
         UserActionTypeEnum actionTypeEnum = UserActionTypeEnum.getEnum(userActionDTO.getActionType());
         VideoInfoDTO videoInfo = Optional.ofNullable(videoInfoClient.getVideoInfoByVideoId(userActionDTO.getVideoId()))
@@ -65,6 +79,10 @@ public class UserActionCommandServiceImpl implements UserActionCommandService {
                 break;
             case VIDEO_COIN:
                 handleCoinAction(userActionDTO, userId, videoInfo, actionTypeEnum);
+                break;
+            case COMMENT_LIKE:
+            case COMMENT_HATE:
+                handleCommentAction(userActionDTO, userId, actionTypeEnum);
                 break;
             default:
                 throw new BusinessException("当前互动类型暂未接入异步同步");
@@ -116,7 +134,7 @@ public class UserActionCommandServiceImpl implements UserActionCommandService {
         }
 
         int actionCount = normalizeActionCount(userActionDTO.getActionCount());
-        ensureCurrentCoinLoaded(userId);
+        refreshCurrentCoinFromDb(userId);
         ensureCurrentCoinLoaded(videoInfo.getUserId());
 
         Long luaResult = interactRedisComponent.executeVideoCoinAction(
@@ -144,11 +162,80 @@ public class UserActionCommandServiceImpl implements UserActionCommandService {
                 actionTypeEnum, true, actionCount));
     }
 
+    private void handleCommentAction(UserActionDTO userActionDTO, String userId, UserActionTypeEnum actionTypeEnum) {
+        if (userActionDTO.getCommentId() == null) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600);
+        }
+
+        VideoComment videoComment = Optional.ofNullable(videoCommentMapper.selectByCommentId(userActionDTO.getCommentId()))
+                .orElseThrow(() -> new BusinessException(ResponseCodeEnum.CODE_600));
+        if (!userActionDTO.getVideoId().equals(videoComment.getVideoId())) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600);
+        }
+
+        Integer oldActionType = userCommentActionMapper.selectActionTypeForUpdate(videoComment.getCommentId(), userId);
+        if (actionTypeEnum.getType().equals(oldActionType)) {
+            userCommentActionMapper.deleteByCommentIdAndUserId(videoComment.getCommentId(), userId);
+            updateCommentActionCount(videoComment.getCommentId(), oldActionType, -Constants.ONE);
+            interactRedisComponent.removeCommentActionStatus(userId, videoComment.getCommentId());
+            return;
+        }
+
+        Date actionTime = new Date();
+        UserCommentAction userCommentAction = buildCommentAction(userId, videoComment, actionTypeEnum, actionTime);
+        if (oldActionType == null) {
+            userCommentActionMapper.insertIgnore(userCommentAction);
+        } else {
+            userCommentActionMapper.updateByCommentIdAndUserId(userCommentAction, videoComment.getCommentId(), userId);
+            updateCommentActionCount(videoComment.getCommentId(), oldActionType, -Constants.ONE);
+        }
+        updateCommentActionCount(videoComment.getCommentId(), actionTypeEnum.getType(), Constants.ONE);
+        interactRedisComponent.saveCommentActionStatus(userId, videoComment.getCommentId(), actionTypeEnum.getType());
+
+        if (UserActionTypeEnum.COMMENT_LIKE.equals(actionTypeEnum)) {
+            userMessageEventProducer.sendCommentLikeMessage(userId, videoComment, actionTime);
+        }
+    }
+
+    private UserCommentAction buildCommentAction(String userId,
+                                                 VideoComment videoComment,
+                                                 UserActionTypeEnum actionTypeEnum,
+                                                 Date actionTime) {
+        UserCommentAction userCommentAction = new UserCommentAction();
+        userCommentAction.setVideoId(videoComment.getVideoId());
+        userCommentAction.setVideoUserId(videoComment.getVideoUserId());
+        userCommentAction.setCommentId(videoComment.getCommentId());
+        userCommentAction.setActionType(actionTypeEnum.getType());
+        userCommentAction.setUserId(userId);
+        userCommentAction.setActionTime(actionTime);
+        return userCommentAction;
+    }
+
+    private void updateCommentActionCount(Integer commentId, Integer actionType, int delta) {
+        if (UserActionTypeEnum.COMMENT_LIKE.getType().equals(actionType)) {
+            videoCommentMapper.updateCount(commentId, delta, Constants.ZERO);
+            return;
+        }
+        if (UserActionTypeEnum.COMMENT_HATE.getType().equals(actionType)) {
+            videoCommentMapper.updateCount(commentId, Constants.ZERO, delta);
+        }
+    }
+
     private void ensureCurrentCoinLoaded(String userId) {
         Integer currentCoin = interactRedisComponent.getUserStatsValue(userId, UserStatsRedisEnum.USER_COIN.getField());
         if (currentCoin != null) {
             return;
         }
+        refreshCurrentCoinFromDb(userId);
+    }
+
+    /**
+     * 当前硬币数属于余额型数据，投币前不能只信任 interact 自己的缓存。
+     * 这里每次都从 user 服务取数据库真值覆盖 Redis，避免旧值把第一次投币误判成余额不足。
+     *
+     * @param userId 用户 id
+     */
+    private void refreshCurrentCoinFromDb(String userId) {
         List<UserInfoDTO> userInfoList = userInfoClient.getUserInfoByIds(List.of(userId));
         if (userInfoList == null || userInfoList.isEmpty() || userInfoList.get(0).getCurrentCoinCount() == null) {
             throw new BusinessException(ResponseCodeEnum.CODE_600);

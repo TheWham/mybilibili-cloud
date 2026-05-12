@@ -99,6 +99,13 @@
             <artifactId>easy-captcha</artifactId>
         </dependency>
 
+        <!-- ArithmeticCaptcha 在 JDK 15+ 环境下需要外置 Nashorn 才能计算算术验证码结果。 -->
+        <dependency>
+            <groupId>org.openjdk.nashorn</groupId>
+            <artifactId>nashorn-core</artifactId>
+            <version>15.4</version>
+        </dependency>
+
         <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>

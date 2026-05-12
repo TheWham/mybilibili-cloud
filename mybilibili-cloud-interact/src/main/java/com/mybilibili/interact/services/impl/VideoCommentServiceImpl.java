@@ -21,6 +21,7 @@ import com.mybilibili.interact.entity.query.VideoCommentQuery;
 import com.mybilibili.interact.entity.vo.VideoCommentVO;
 import com.mybilibili.interact.mappers.UserCommentActionMapper;
 import com.mybilibili.interact.mappers.VideoCommentMapper;
+import com.mybilibili.interact.mq.producer.UserMessageEventProducer;
 import com.mybilibili.interact.services.VideoCommentService;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
@@ -49,6 +50,8 @@ public class VideoCommentServiceImpl implements VideoCommentService {
     private UserInfoClient userInfoClient;
     @Resource
     private VideoInfoClient videoInfoClient;
+    @Resource
+    private UserMessageEventProducer userMessageEventProducer;
 
     @Override
     public List<VideoComment> findListByParam(VideoCommentQuery param) {
@@ -111,6 +114,7 @@ public class VideoCommentServiceImpl implements VideoCommentService {
         videoComment.setLikeCount(defaultValue(videoComment.getLikeCount()));
         videoComment.setHateCount(defaultValue(videoComment.getHateCount()));
         add(videoComment);
+        userMessageEventProducer.sendCommentMessage(videoComment);
     }
 
     @Override

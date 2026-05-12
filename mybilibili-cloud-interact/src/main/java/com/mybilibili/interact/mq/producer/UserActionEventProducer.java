@@ -22,6 +22,8 @@ public class UserActionEventProducer {
 
     @Resource
     private RabbitTemplate rabbitTemplate;
+    @Resource
+    private UserMessageEventProducer userMessageEventProducer;
 
     public void sendUserActionEvent(UserActionSyncEvent event) {
         if (!validActionEvent(event)) {
@@ -33,6 +35,7 @@ public class UserActionEventProducer {
         rabbitTemplate.convertAndSend(MqConstants.USER_ACTION_EXCHANGE,
                 MqConstants.VIDEO_ACTION_COUNT_ROUTING_KEY,
                 event);
+        userMessageEventProducer.sendUserActionMessage(event);
 
         if (UserActionTypeEnum.VIDEO_COIN.getType().equals(event.getActionType())) {
             rabbitTemplate.convertAndSend(MqConstants.USER_ACTION_EXCHANGE,
