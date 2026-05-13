@@ -13,7 +13,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -31,7 +30,6 @@ public class VideoDanmuController extends ABaseController {
     public ResponseVO postDanmu(@Validated VideoDanmuDTO videoDanmuDTO) {
         VideoDanmu videoDanmu = BeanUtil.toBean(videoDanmuDTO, VideoDanmu.class);
         videoDanmu.setUserId(getTokenUserInfo().getUserId());
-        videoDanmu.setPostTime(new Date());
         videoDanmuService.postDanmu(videoDanmu);
         return getSuccessResponseVO(null);
     }

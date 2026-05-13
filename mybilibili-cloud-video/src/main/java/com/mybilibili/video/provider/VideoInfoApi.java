@@ -2,12 +2,7 @@ package com.mybilibili.video.provider;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.mybilibili.base.constants.Constants;
-import com.mybilibili.base.entity.dto.UserActionSyncDTO;
-import com.mybilibili.base.entity.dto.UserVideoSeriesDTO;
-import com.mybilibili.base.entity.dto.VideoCountDTO;
-import com.mybilibili.base.entity.dto.VideoInfoDTO;
-import com.mybilibili.base.entity.dto.VideoInfoFilePostDTO;
-import com.mybilibili.base.entity.dto.VideoInfoPostDTO;
+import com.mybilibili.base.entity.dto.*;
 import com.mybilibili.base.entity.vo.*;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.enums.ResponseCodeEnum;
@@ -28,8 +23,8 @@ import com.mybilibili.video.services.VideoInfoFilePostService;
 import com.mybilibili.video.services.VideoInfoPostService;
 import com.mybilibili.video.services.VideoInfoService;
 import jakarta.annotation.Resource;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -113,12 +108,16 @@ public class VideoInfoApi{
                                                      @RequestParam("userId") String userId
     )
     {
-        PaginationResultVO<UserActionSyncDTO> userCollectionVideoPage = userVideoActionClient.getUserCollectionVideoList(pageNo, userId);
-        List<UserActionSyncDTO> list = userCollectionVideoPage.getList();
+        PaginationResultVO<UserCollectionVO> userCollectionVideoPage = userVideoActionClient.getUserCollectionVideoList(pageNo, userId);
+        List<UserCollectionVO> list = userCollectionVideoPage.getList();
+
+        if (list == null || list.isEmpty())
+            return new PaginationResultVO<UserCollectionVO>();
+
         Map<String, Date> videoIdTimeMap = list.stream()
-        .collect(Collectors.toMap(UserActionSyncDTO::getVideoId, UserActionSyncDTO::getActionTime, (left, right) -> left));
+        .collect(Collectors.toMap(UserCollectionVO::getVideoId, UserCollectionVO::getActionTime, (left, right) -> left));
         // 收藏页要保持“收藏时间倒序”的展示顺序，不能直接按数据库 in 查询结果返回。
-        List<String> userCollectionIds = list.stream().map(UserActionSyncDTO::getVideoId).collect(Collectors.toList());
+        List<String> userCollectionIds = list.stream().map(UserCollectionVO::getVideoId).collect(Collectors.toList());
         List<VideoInfo> unOrderVideoInfos = videoInfoService.selectByIds(userCollectionIds);
         Map<String, VideoInfo> videoCollectMap = unOrderVideoInfos.stream().collect(Collectors.toMap(VideoInfo::getVideoId, videoInfo -> videoInfo));
         List<VideoInfo> finalOrderVideoList = userCollectionIds.stream()
@@ -289,11 +288,23 @@ public class VideoInfoApi{
         if (videoIds == null || videoIds.isEmpty()) {
             return Collections.emptyList();
         }
-        List<VideoInfo> videoInfoList = videoInfoService.selectByIds(videoIds);
-        if (videoInfoList == null || videoInfoList.isEmpty()) {
+        List<VideoInfo> unOrderVideoInfos = videoInfoService.selectByIds(videoIds);
+
+        if (unOrderVideoInfos == null || unOrderVideoInfos.isEmpty()) {
             return Collections.emptyList();
         }
-        return BeanUtil.copyToList(videoInfoList, UserCollectionVO.class);
+
+        Map<String, VideoInfo> videoCollectMap = unOrderVideoInfos.stream()
+                .collect(Collectors.toMap(VideoInfo::getVideoId, videoInfo -> videoInfo));
+
+        List<VideoInfo> finalOrderVideoList = videoIds.stream()
+                .map(videoCollectMap::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        List<UserCollectionVO> userCollectionVOList = BeanUtil.copyToList(finalOrderVideoList, UserCollectionVO.class);
+
+        return userCollectionVOList;
     }
 
     /**

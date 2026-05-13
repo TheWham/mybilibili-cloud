@@ -43,6 +43,7 @@ public class Constants {
     public static final Integer REDIS_USER_STATS_CACHE_TTL_DAYS = 15;
     public static final Integer REDIS_VIDEO_PLAY_EFFECTIVE_EXPIRE_MINUTES = 30;
     public static final Integer REDIS_ACTION_STATUS_CACHE_TTL_MINUTES = 10;
+    public static final Integer REDIS_VIDEO_DANMU_CACHE_TTL_MINUTES = 5;
     // 阻塞等待时间要小于 Redis 客户端超时时间，避免空队列时被客户端当成超时异常。
     public static final Integer REDIS_QUEUE_BLOCK_SECONDS = 3;
 
@@ -125,6 +126,8 @@ public class Constants {
     public static final String REDIS_KEY_VIDEO_PLAY_EFFECTIVE = REDIS_PREFIX + "video:play:effective:";
     public static final String REDIS_KEY_VIDEO_PLAY_COUNT_DELTA = REDIS_PREFIX + "video:play:delta";
     public static final String REDIS_KEY_VIDEO_ACTION_COUNT_DELTA = REDIS_PREFIX + "video:action:delta:";
+    public static final String REDIS_KEY_VIDEO_INFO_CACHE = REDIS_PREFIX + "video:info:";
+    public static final String REDIS_KEY_VIDEO_DANMU_STATUS_CACHE = REDIS_PREFIX + "video:danmu:status:";
 
     /**
      * 用户展示信息和实时统计缓存。

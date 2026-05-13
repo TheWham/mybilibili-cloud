@@ -1,6 +1,8 @@
 package com.mybilibili.common.component;
 
 import com.mybilibili.base.constants.Constants;
+import com.mybilibili.base.enums.ResponseCodeEnum;
+import com.mybilibili.base.exception.BusinessException;
 import com.mybilibili.common.redis.RedisUtils;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
@@ -19,31 +21,55 @@ import org.springframework.util.StringUtils;
 public class MqIdempotentComponent {
 
     private static final String DONE_KEY_PREFIX = Constants.REDIS_PREFIX + "mq:done:";
+    private static final String PROCESSING_KEY_PREFIX = Constants.REDIS_PREFIX + "mq:processing:";
     private static final long DONE_EXPIRE_TIME = (long) Constants.REDIS_EXPIRE_TIME_ONE_DAY * Constants.REDIS_EXPIRE_TIME_DAY_COUNT;
+    private static final long PROCESSING_EXPIRE_TIME = (long) Constants.REDIS_EXPIRE_TIME_ONE_MINUTE
+            * Constants.REDIS_EXPIRE_TIME_MINUTE_COUNT;
 
     @Resource
     private RedisUtils<Object> redisUtils;
 
     public boolean tryStart(String queueName, String eventId) {
-        if (!StringUtils.hasText(queueName) || !StringUtils.hasText(eventId)) {
-            return true;
+        checkParam(queueName, eventId);
+        if (redisUtils.keyExists(buildDoneKey(queueName, eventId))) {
+            return false;
         }
-        return !redisUtils.keyExists(buildDoneKey(queueName, eventId));
+
+        // 抢占处理中标记，避免同一事件在多个消费者实例上并发执行。
+        return redisUtils.setIfAbsent(buildProcessingKey(queueName, eventId),
+                Constants.ONE,
+                PROCESSING_EXPIRE_TIME);
     }
 
     public void markDone(String queueName, String eventId) {
-        if (!StringUtils.hasText(queueName) || !StringUtils.hasText(eventId)) {
-            return;
+        checkParam(queueName, eventId);
+        boolean success = redisUtils.setex(buildDoneKey(queueName, eventId), Constants.ONE, DONE_EXPIRE_TIME);
+        if (!success) {
+            // done 标记写失败时不能正常 ACK，否则后续重投会再次执行业务。
+            throw new BusinessException(ResponseCodeEnum.CODE_503);
         }
-        redisUtils.setex(buildDoneKey(queueName, eventId), Constants.ONE, DONE_EXPIRE_TIME);
+        redisUtils.delete(buildProcessingKey(queueName, eventId));
     }
 
     public void release(String queueName, String eventId) {
-        // done 标记只在业务成功后写入，失败时没有额外状态需要清理。
+        if (!StringUtils.hasText(queueName) || !StringUtils.hasText(eventId)) {
+            return;
+        }
+        redisUtils.delete(buildProcessingKey(queueName, eventId));
     }
 
     private String buildDoneKey(String queueName, String eventId) {
         return DONE_KEY_PREFIX + queueName + ":" + eventId;
+    }
+
+    private String buildProcessingKey(String queueName, String eventId) {
+        return PROCESSING_KEY_PREFIX + queueName + ":" + eventId;
+    }
+
+    private void checkParam(String queueName, String eventId) {
+        if (!StringUtils.hasText(queueName) || !StringUtils.hasText(eventId)) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600);
+        }
     }
 
 }

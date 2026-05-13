@@ -59,6 +59,32 @@ public class UserDailyLimitComponent {
                 expireMilliseconds);
     }
 
+    public void occupyDailyAction(String userId, UserDailyLimitTypeEnum limitType) {
+        Integer limitCount = getLimitCount(limitType);
+        if (limitCount == null || limitCount <= 0) {
+            return;
+        }
+
+        String redisKey = buildDailyLimitKey(userId, limitType);
+        long expireMilliseconds = getRemainMillisecondsToday();
+        Long result = redisUtils.executeLongScript(Constants.REDIS_LUA_USER_DAILY_LIMIT,
+                Collections.singletonList(redisKey),
+                limitCount,
+                expireMilliseconds);
+        if (result == null || result <= 0) {
+            throw new BusinessException(String.format("%s已达到今日上限", limitType.getDesc()));
+        }
+    }
+
+    public void releaseDailyAction(String userId, UserDailyLimitTypeEnum limitType) {
+        Integer limitCount = getLimitCount(limitType);
+        if (limitCount == null || limitCount <= 0) {
+            return;
+        }
+
+        redisUtils.decrement(buildDailyLimitKey(userId, limitType));
+    }
+
     private Integer getLimitCount(UserDailyLimitTypeEnum limitType) {
         SysSettingDTO sysSettingDTO;
         try {

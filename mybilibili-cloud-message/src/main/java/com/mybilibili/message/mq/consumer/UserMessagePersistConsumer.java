@@ -9,6 +9,8 @@ import com.mybilibili.message.enums.MessageReadTypeEnum;
 import com.mybilibili.message.services.UserMessageService;
 import jakarta.annotation.Resource;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -26,6 +28,8 @@ import java.util.List;
 @Component
 public class UserMessagePersistConsumer {
 
+    private static final Logger log = LoggerFactory.getLogger(UserMessagePersistConsumer.class);
+
     @Resource
     private UserMessageService userMessageService;
     @Resource
@@ -34,6 +38,7 @@ public class UserMessagePersistConsumer {
     @RabbitListener(queues = MqConstants.USER_MESSAGE_PERSIST_QUEUE)
     public void consumeUserMessageEvent(UserMessageEvent event) {
         if (!validMessageEvent(event)) {
+            log.warn("用户站内信消息参数不完整，event:{}", event);
             return;
         }
         if (!mqIdempotentComponent.tryStart(MqConstants.USER_MESSAGE_PERSIST_QUEUE, event.getEventId())) {

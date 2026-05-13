@@ -78,4 +78,19 @@ public final class MqConstants {
      * 用户站内信落库路由键。
      */
     public static final String USER_MESSAGE_PERSIST_ROUTING_KEY = "user.message.persist";
+
+    /**
+     * 弹幕事件交换机。
+     */
+    public static final String DANMU_EXCHANGE = "mybilibili.danmu.exchange";
+
+    /**
+     * 弹幕批量落库队列，由 interact 服务消费。
+     */
+    public static final String DANMU_PERSIST_QUEUE = "mybilibili.danmu.persist.queue";
+
+    /**
+     * 弹幕批量落库路由键。
+     */
+    public static final String DANMU_PERSIST_ROUTING_KEY = "danmu.persist";
 }

@@ -1,24 +1,33 @@
 package com.mybilibili.interact.services.impl;
 
-import com.mybilibili.base.entity.query.SimplePage;
+import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.VideoInfoDTO;
+import com.mybilibili.base.entity.event.VideoDanmuPostEvent;
+import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.enums.ResponseCodeEnum;
+import com.mybilibili.base.enums.UserDailyLimitTypeEnum;
 import com.mybilibili.base.exception.BusinessException;
+import com.mybilibili.base.utils.JsonUtils;
 import com.mybilibili.common.component.UserDailyLimitComponent;
+import com.mybilibili.common.redis.RedisUtils;
+import com.mybilibili.common.utils.StringTools;
 import com.mybilibili.interact.consumer.VideoInfoClient;
 import com.mybilibili.interact.entity.po.VideoDanmu;
 import com.mybilibili.interact.entity.query.VideoDanmuQuery;
 import com.mybilibili.interact.mappers.VideoDanmuMapper;
+import com.mybilibili.interact.mq.producer.VideoDanmuEventProducer;
 import com.mybilibili.interact.services.VideoDanmuService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * 视频弹幕 Service。
@@ -34,6 +43,12 @@ public class VideoDanmuServiceImpl implements VideoDanmuService {
 
     @Resource
     private VideoInfoClient videoInfoClient;
+
+    @Resource
+    private RedisUtils<String> redisUtils;
+
+    @Resource
+    private VideoDanmuEventProducer videoDanmuEventProducer;
 
     @Override
     public List<VideoDanmu> findListByParam(VideoDanmuQuery param) {
@@ -102,24 +117,25 @@ public class VideoDanmuServiceImpl implements VideoDanmuService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void postDanmu(VideoDanmu videoDanmu) {
-        VideoInfoDTO videoInfo = Optional.ofNullable(videoInfoClient.getVideoInfoByVideoId(videoDanmu.getVideoId()))
-                .orElseThrow(() -> new BusinessException(ResponseCodeEnum.CODE_600));
-        // 视频作者必须以后端查询结果为准，前端传归属字段会带来伪造风险。
-        videoDanmu.setVideoUserId(videoInfo.getUserId());
-        if (!checkDanmuOpen(videoDanmu.getVideoId())) {
+        validatePostDanmu(videoDanmu);
+        VideoInfoDTO videoInfo = getVideoInfoWithCache(videoDanmu.getVideoId());
+        if (!checkDanmuOpenWithCache(videoDanmu.getVideoId())) {
             throw new BusinessException("弹幕功能已关闭");
         }
-        add(videoDanmu);
-        // TODO 后续通过 video/search 服务或消息队列更新视频弹幕数和 ES 计数字段。
-        // TODO 后续接入日限额成功链路后，保留“写入成功再记录”的顺序。
-        // userDailyLimitComponent.recordDailyAction(videoDanmu.getUserId(), UserDailyLimitTypeEnum.DANMU);
+        userDailyLimitComponent.occupyDailyAction(videoDanmu.getUserId(), UserDailyLimitTypeEnum.DANMU);
+
+        try {
+            videoDanmuEventProducer.sendDanmuPostEvent(buildDanmuPostEvent(videoDanmu, videoInfo));
+        } catch (RuntimeException e) {
+            userDailyLimitComponent.releaseDailyAction(videoDanmu.getUserId(), UserDailyLimitTypeEnum.DANMU);
+            throw new BusinessException(ResponseCodeEnum.CODE_503);
+        }
     }
 
     @Override
     public List<VideoDanmu> loadDanmu(String fileId, String videoId) {
-        if (!checkDanmuOpen(videoId)) {
+        if (!checkDanmuOpenWithCache(videoId)) {
             return Collections.emptyList();
         }
         VideoDanmuQuery danmuQuery = new VideoDanmuQuery();
@@ -131,6 +147,73 @@ public class VideoDanmuServiceImpl implements VideoDanmuService {
     private boolean checkDanmuOpen(String videoId) {
         Boolean danmuOpen = videoInfoClient.checkVideoDanmuStatusByVideoId(videoId);
         return Boolean.TRUE.equals(danmuOpen);
+    }
+
+    private void validatePostDanmu(VideoDanmu videoDanmu) {
+        if (videoDanmu == null
+                || StringTools.isEmpty(videoDanmu.getUserId())
+                || StringTools.isEmpty(videoDanmu.getVideoId())
+                || StringTools.isEmpty(videoDanmu.getFileId())
+                || StringTools.isEmpty(videoDanmu.getText())
+                || videoDanmu.getTime() == null) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600);
+        }
+        if (videoDanmu.getTime() < Constants.ZERO) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600);
+        }
+
+        // 前端已经做了长度校验，这里再做一次兜底，避免绕过 Controller 直接调服务层。
+        String text = videoDanmu.getText().trim();
+        if (StringTools.isEmpty(text) || text.length() > 300) {
+            throw new BusinessException(ResponseCodeEnum.CODE_600);
+        }
+        videoDanmu.setText(text);
+    }
+
+    private VideoInfoDTO getVideoInfoWithCache(String videoId) {
+        String redisKey = Constants.REDIS_KEY_VIDEO_INFO_CACHE + videoId;
+        String videoInfoJson = redisUtils.get(redisKey);
+        if (!StringTools.isEmpty(videoInfoJson)) {
+            return JsonUtils.convertJson2Obj(videoInfoJson, VideoInfoDTO.class);
+        }
+
+        VideoInfoDTO videoInfo = Optional.ofNullable(videoInfoClient.getVideoInfoByVideoId(videoId))
+                .orElseThrow(() -> new BusinessException(ResponseCodeEnum.CODE_600));
+        redisUtils.setex(redisKey,
+                JsonUtils.convertObj2Json(videoInfo),
+                Constants.REDIS_VIDEO_DANMU_CACHE_TTL_MINUTES * Constants.REDIS_EXPIRE_TIME_ONE_MINUTE);
+        return videoInfo;
+    }
+
+    private boolean checkDanmuOpenWithCache(String videoId) {
+        String redisKey = Constants.REDIS_KEY_VIDEO_DANMU_STATUS_CACHE + videoId;
+        String cacheValue = redisUtils.get(redisKey);
+
+        if (!StringTools.isEmpty(cacheValue)) {
+            return Constants.ONE.toString().equals(cacheValue);
+        }
+
+        boolean danmuOpen = checkDanmuOpen(videoId);
+        redisUtils.setex(redisKey,
+                danmuOpen ? Constants.ONE.toString() : Constants.ZERO.toString(),
+                Constants.REDIS_VIDEO_DANMU_CACHE_TTL_MINUTES * Constants.REDIS_EXPIRE_TIME_ONE_MINUTE);
+        return danmuOpen;
+    }
+
+    private VideoDanmuPostEvent buildDanmuPostEvent(VideoDanmu videoDanmu, VideoInfoDTO videoInfo) {
+        VideoDanmuPostEvent event = new VideoDanmuPostEvent();
+        event.setEventId(UUID.randomUUID().toString().replace("-", ""));
+        event.setVideoId(videoDanmu.getVideoId());
+        // 视频作者必须以后端查询结果为准，前端传归属字段会带来伪造风险。
+        event.setVideoUserId(videoInfo.getUserId());
+        event.setFileId(videoDanmu.getFileId());
+        event.setUserId(videoDanmu.getUserId());
+        event.setPostTime(new Date());
+        event.setText(videoDanmu.getText());
+        event.setMode(videoDanmu.getMode());
+        event.setColor(videoDanmu.getColor());
+        event.setTime(videoDanmu.getTime());
+        return event;
     }
 
     private boolean isVideoOwner(String videoId, String userId) {
