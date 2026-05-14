@@ -114,6 +114,25 @@ public class ABaseController {
         return tokenInfo;
     }
 
+    /**
+     * 尝试读取当前登录用户。
+     *
+     * <p>用于允许匿名访问的接口。没有 token 或 token 已失效时直接返回 null，
+     * 由具体业务自己决定是否继续走匿名逻辑。</p>
+     */
+    protected TokenUserInfoDTO getOptionalTokenUserInfo() {
+        HttpServletRequest request =
+                ((ServletRequestAttributes) RequestContextHolder
+                        .getRequestAttributes())
+                        .getRequest();
+
+        String tokenId = request.getHeader(Constants.WEB_TOKEN_KEY);
+        if (tokenId == null || tokenId.isEmpty()) {
+            return null;
+        }
+        return tokenRedisComponent.getTokenInfo(tokenId);
+    }
+
     protected void cleanCookie(HttpServletResponse response)
     {
         HttpServletRequest request =

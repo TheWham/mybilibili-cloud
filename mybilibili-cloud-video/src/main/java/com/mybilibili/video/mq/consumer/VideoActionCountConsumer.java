@@ -11,6 +11,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 视频互动计数消费者。
  *
@@ -27,25 +30,49 @@ public class VideoActionCountConsumer {
     @Resource
     private MqIdempotentComponent mqIdempotentComponent;
 
-    @RabbitListener(queues = MqConstants.VIDEO_ACTION_COUNT_QUEUE)
-    public void consumeVideoActionCountEvent(UserActionSyncEvent event) {
-        if (event == null
-                || !StringUtils.hasText(event.getEventId())
-                || event.getVideoId() == null
-                || event.getActionType() == null
-                || event.getActionCount() == null) {
-            log.warn("视频互动计数消息参数不完整，event:{}", event);
+    @RabbitListener(queues = MqConstants.VIDEO_ACTION_COUNT_QUEUE,
+            containerFactory = "videoActionCountBatchRabbitListenerContainerFactory")
+    public void consumeVideoActionCountEvent(List<UserActionSyncEvent> eventList) {
+        if (eventList == null || eventList.isEmpty()) {
             return;
         }
-        if (!mqIdempotentComponent.tryStart(MqConstants.VIDEO_ACTION_COUNT_QUEUE, event.getEventId())) {
+
+        List<UserActionSyncEvent> processingEventList = new ArrayList<>();
+        List<String> processingEventIdList = new ArrayList<>();
+        for (UserActionSyncEvent event : eventList) {
+            if (!validActionCountEvent(event)) {
+                log.warn("视频互动计数消息参数不完整，event:{}", event);
+                continue;
+            }
+            if (!mqIdempotentComponent.tryStart(MqConstants.VIDEO_ACTION_COUNT_QUEUE, event.getEventId())) {
+                continue;
+            }
+            processingEventList.add(event);
+            processingEventIdList.add(event.getEventId());
+        }
+
+        if (processingEventList.isEmpty()) {
             return;
         }
+
         try {
-            videoActionCountSyncService.syncVideoActionCount(event);
-            mqIdempotentComponent.markDone(MqConstants.VIDEO_ACTION_COUNT_QUEUE, event.getEventId());
+            videoActionCountSyncService.syncVideoActionCount(processingEventList);
+            for (String eventId : processingEventIdList) {
+                mqIdempotentComponent.markDone(MqConstants.VIDEO_ACTION_COUNT_QUEUE, eventId);
+            }
         } catch (RuntimeException e) {
-            mqIdempotentComponent.release(MqConstants.VIDEO_ACTION_COUNT_QUEUE, event.getEventId());
+            for (String eventId : processingEventIdList) {
+                mqIdempotentComponent.release(MqConstants.VIDEO_ACTION_COUNT_QUEUE, eventId);
+            }
             throw e;
         }
+    }
+
+    private boolean validActionCountEvent(UserActionSyncEvent event) {
+        return event != null
+                && StringUtils.hasText(event.getEventId())
+                && event.getVideoId() != null
+                && event.getActionType() != null
+                && event.getActionCount() != null;
     }
 }

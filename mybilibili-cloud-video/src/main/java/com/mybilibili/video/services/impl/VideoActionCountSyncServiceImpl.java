@@ -17,7 +17,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 视频互动计数同步实现。
@@ -42,37 +45,129 @@ public class VideoActionCountSyncServiceImpl implements VideoActionCountSyncServ
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void syncVideoActionCount(UserActionSyncEvent event) {
-        UserActionTypeEnum actionTypeEnum = UserActionTypeEnum.getEnum(event.getActionType());
-        if (!supportVideoCount(actionTypeEnum) || event.getActionCount() == null || event.getActionCount() == 0) {
+    public void syncVideoActionCount(List<UserActionSyncEvent> eventList) {
+        if (eventList == null || eventList.isEmpty()) {
             return;
         }
 
-        videoInfoMapper.updateCountBatch(actionTypeEnum.getField(),
-                List.of(new VideoCountUpdateDTO(event.getVideoId(), event.getActionCount())));
-        videoRedisComponent.addVideoActionCountDelta(event.getVideoId(), actionTypeEnum.getField(), -event.getActionCount());
-        syncSearchCollectCount(event, actionTypeEnum);
+        Map<UserActionTypeEnum, List<VideoCountUpdateDTO>> countUpdateMap = new LinkedHashMap<>();
+        Map<UserActionTypeEnum, List<UserActionSyncEvent>> searchEventMap = new LinkedHashMap<>();
+
+        for (UserActionSyncEvent event : eventList) {
+            UserActionTypeEnum actionTypeEnum = event == null ? null : UserActionTypeEnum.getEnum(event.getActionType());
+            if (!supportVideoCount(actionTypeEnum) || event.getActionCount() == null || event.getActionCount() == 0) {
+                continue;
+            }
+            mergeVideoCount(countUpdateMap, actionTypeEnum, event);
+            mergeSearchEvent(searchEventMap, actionTypeEnum, event);
+        }
+
+        for (Map.Entry<UserActionTypeEnum, List<VideoCountUpdateDTO>> entry : countUpdateMap.entrySet()) {
+            UserActionTypeEnum actionTypeEnum = entry.getKey();
+            List<VideoCountUpdateDTO> updateList = entry.getValue();
+            if (updateList.isEmpty()) {
+                continue;
+            }
+            videoInfoMapper.updateCountBatch(actionTypeEnum.getField(), updateList);
+            offsetVideoActionDelta(actionTypeEnum, updateList);
+        }
+
+        for (Map.Entry<UserActionTypeEnum, List<UserActionSyncEvent>> entry : searchEventMap.entrySet()) {
+            syncSearchCollectCount(entry.getValue(), entry.getKey());
+        }
     }
 
     private boolean supportVideoCount(UserActionTypeEnum actionTypeEnum) {
         return UserActionTypeEnum.VIDEO_LIKE.equals(actionTypeEnum)
                 || UserActionTypeEnum.VIDEO_COLLECT.equals(actionTypeEnum)
-                || UserActionTypeEnum.VIDEO_COIN.equals(actionTypeEnum);
+                || UserActionTypeEnum.VIDEO_COIN.equals(actionTypeEnum)
+                || UserActionTypeEnum.VIDEO_DNAMU.equals(actionTypeEnum);
     }
 
-    private void syncSearchCollectCount(UserActionSyncEvent event, UserActionTypeEnum actionTypeEnum) {
-        if (!UserActionTypeEnum.VIDEO_COLLECT.equals(actionTypeEnum)) {
+    private void syncSearchCollectCount(List<UserActionSyncEvent> eventList, UserActionTypeEnum actionTypeEnum) {
+        SearchOrderTypeEnum orderTypeEnum = getSearchOrderType(actionTypeEnum);
+        if (orderTypeEnum == null) {
             return;
         }
         try {
-            VideoSearchCountUpdateDTO updateDTO = new VideoSearchCountUpdateDTO();
-            updateDTO.setVideoId(event.getVideoId());
-            updateDTO.setChangeCount(event.getActionCount());
-            updateDTO.setOrderType(SearchOrderTypeEnum.VIDEO_COLLECT.getStatus());
-            searchVideoClient.updateVideoCount(updateDTO);
+            for (UserActionSyncEvent event : eventList) {
+                VideoSearchCountUpdateDTO updateDTO = new VideoSearchCountUpdateDTO();
+                updateDTO.setVideoId(event.getVideoId());
+                updateDTO.setChangeCount(event.getActionCount());
+                updateDTO.setOrderType(orderTypeEnum.getStatus());
+                searchVideoClient.updateVideoCount(updateDTO);
+            }
         } catch (Exception e) {
             // 搜索索引是展示侧数据，失败不回滚主库；后续重建索引可以修正。
-            log.warn("同步收藏数到搜索索引失败，videoId:{}", event.getVideoId(), e);
+            log.warn("同步视频计数到搜索索引失败，videoId:{}, actionType:{}",
+                    eventList.isEmpty() ? null : eventList.get(0).getVideoId(), actionTypeEnum, e);
         }
+    }
+
+    private void mergeVideoCount(Map<UserActionTypeEnum, List<VideoCountUpdateDTO>> countUpdateMap,
+                                 UserActionTypeEnum actionTypeEnum,
+                                 UserActionSyncEvent event) {
+        List<VideoCountUpdateDTO> updateList = countUpdateMap.computeIfAbsent(actionTypeEnum, key -> new ArrayList<>());
+        VideoCountUpdateDTO countUpdateDTO = findCountUpdate(updateList, event.getVideoId());
+        if (countUpdateDTO == null) {
+            updateList.add(new VideoCountUpdateDTO(event.getVideoId(), event.getActionCount()));
+            return;
+        }
+        countUpdateDTO.setCount(countUpdateDTO.getCount() + event.getActionCount());
+    }
+
+    private void mergeSearchEvent(Map<UserActionTypeEnum, List<UserActionSyncEvent>> searchEventMap,
+                                  UserActionTypeEnum actionTypeEnum,
+                                  UserActionSyncEvent event) {
+        SearchOrderTypeEnum orderTypeEnum = getSearchOrderType(actionTypeEnum);
+        if (orderTypeEnum == null) {
+            return;
+        }
+        List<UserActionSyncEvent> eventList = searchEventMap.computeIfAbsent(actionTypeEnum, key -> new ArrayList<>());
+        UserActionSyncEvent mergedEvent = findSearchEvent(eventList, event.getVideoId());
+        if (mergedEvent == null) {
+            UserActionSyncEvent copyEvent = new UserActionSyncEvent();
+            copyEvent.setVideoId(event.getVideoId());
+            copyEvent.setActionCount(event.getActionCount());
+            eventList.add(copyEvent);
+            return;
+        }
+        mergedEvent.setActionCount(mergedEvent.getActionCount() + event.getActionCount());
+    }
+
+    private void offsetVideoActionDelta(UserActionTypeEnum actionTypeEnum, List<VideoCountUpdateDTO> updateList) {
+        for (VideoCountUpdateDTO updateDTO : updateList) {
+            videoRedisComponent.addVideoActionCountDelta(updateDTO.getVideoId(),
+                    actionTypeEnum.getField(),
+                    -updateDTO.getCount());
+        }
+    }
+
+    private VideoCountUpdateDTO findCountUpdate(List<VideoCountUpdateDTO> updateList, String videoId) {
+        for (VideoCountUpdateDTO updateDTO : updateList) {
+            if (videoId.equals(updateDTO.getVideoId())) {
+                return updateDTO;
+            }
+        }
+        return null;
+    }
+
+    private UserActionSyncEvent findSearchEvent(List<UserActionSyncEvent> eventList, String videoId) {
+        for (UserActionSyncEvent event : eventList) {
+            if (videoId.equals(event.getVideoId())) {
+                return event;
+            }
+        }
+        return null;
+    }
+
+    private SearchOrderTypeEnum getSearchOrderType(UserActionTypeEnum actionTypeEnum) {
+        if (UserActionTypeEnum.VIDEO_COLLECT.equals(actionTypeEnum)) {
+            return SearchOrderTypeEnum.VIDEO_COLLECT;
+        }
+        if (UserActionTypeEnum.VIDEO_DNAMU.equals(actionTypeEnum)) {
+            return SearchOrderTypeEnum.VIDEO_DANMU;
+        }
+        return null;
     }
 }

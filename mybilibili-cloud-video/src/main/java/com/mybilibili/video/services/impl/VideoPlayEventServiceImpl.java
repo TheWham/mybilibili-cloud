@@ -28,6 +28,7 @@ public class VideoPlayEventServiceImpl implements VideoPlayEventService {
         //统计用户观看次数
         videoRedisComponent.saveVideoPlayCount2HLL(videoPlayEvent.getVideoId(), videoPlayEvent.getUserId());
 
+        //限制用户30min之内重复观看只计入一次
         boolean effectivePlay = videoRedisComponent.saveVideoEffectivePlay(videoPlayEvent.getVideoId(),
                 videoPlayEvent.getUserId());
 

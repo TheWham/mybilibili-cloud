@@ -375,12 +375,12 @@ public class VideoInfoApi{
     }
 
 
-    @RequestMapping("/getFilePath")
-    public String getFilePath(@RequestParam("fileId") String fileId)
+    @RequestMapping("/getFilePostDTO")
+    public VideoInfoFilePostDTO getFilePostDTO (@RequestParam("fileId") String fileId)
     {
         VideoInfoFilePost filePostByFileId = videoInfoFilePostService.getVideoInfoFilePostByFileId(fileId);
-        String filePath = filePostByFileId.getFilePath();
-        return filePath;
+        VideoInfoFilePostDTO dto = BeanUtil.toBean(filePostByFileId, VideoInfoFilePostDTO.class);
+        return dto;
     }
 
 

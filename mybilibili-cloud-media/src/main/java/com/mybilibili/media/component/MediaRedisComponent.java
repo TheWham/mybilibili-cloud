@@ -3,8 +3,10 @@ package com.mybilibili.media.component;
 import com.alibaba.fastjson2.JSON;
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.SysSettingDTO;
+import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
 import com.mybilibili.base.entity.dto.UploadingFileDTO;
 import com.mybilibili.base.entity.dto.VideoInfoFilePostDTO;
+import com.mybilibili.common.constants.TokenRedisKeys;
 import com.mybilibili.common.consumer.AdminSysSettingClient;
 import com.mybilibili.common.redis.RedisUtils;
 import com.mybilibili.media.constants.MediaRedisKeys;
@@ -65,6 +67,10 @@ public class MediaRedisComponent {
         return (VideoInfoFilePostDTO) redisUtils.brpop(MediaRedisKeys.TRANSFER_FILE_QUEUE,
                 Constants.REDIS_QUEUE_BLOCK_SECONDS,
                 TimeUnit.SECONDS);
+    }
+
+    public TokenUserInfoDTO getTokenInfo(String tokenId) {
+        return (TokenUserInfoDTO) redisUtils.get(TokenRedisKeys.WEB_TOKEN_KEY + tokenId);
     }
 
     public SysSettingDTO getSysSetting() {

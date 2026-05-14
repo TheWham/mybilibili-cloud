@@ -2,6 +2,7 @@ package com.mybilibili.video.controller;
 
 
 import com.mybilibili.base.constants.Constants;
+import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.entity.vo.ResponseVO;
 import com.mybilibili.base.entity.vo.VideoSearchResultVO;
@@ -19,6 +20,7 @@ import com.mybilibili.video.entity.query.VideoInfoQuery;
 import com.mybilibili.video.entity.vo.VideoInfoResultVO;
 import com.mybilibili.video.services.VideoInfoFileService;
 import com.mybilibili.video.services.VideoInfoService;
+import com.mybilibili.video.services.VideoPlayReportService;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotEmpty;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,6 +40,8 @@ public class VideoShowController extends ABaseController {
     private VideoInfoFileService videoInfoFileService;
     @Resource
     private SearchVideoClient searchVideoClient;
+    @Resource
+    private VideoPlayReportService videoPlayReportService;
 
     @RequestMapping("/loadVideo")
     public ResponseVO loadVideo(Integer pageNo, Integer pCategoryId, Integer categoryId)
@@ -89,6 +93,15 @@ public class VideoShowController extends ABaseController {
     {
         Integer count = videoInfoService.reportVideoPlayOnline(fileId, deviceId);
         return getSuccessResponseVO(count);
+    }
+
+    @RequestMapping("/reportVideoPlay")
+    public ResponseVO reportVideoPlay(@NotEmpty String fileId)
+    {
+        TokenUserInfoDTO tokenUserInfo = getOptionalTokenUserInfo();
+        String userId = tokenUserInfo == null ? null : tokenUserInfo.getUserId();
+        videoPlayReportService.reportVideoPlayByFileId(fileId, userId);
+        return getSuccessResponseVO(null);
     }
 
 
