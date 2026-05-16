@@ -1,5 +1,6 @@
 package com.mybilibili.ai.component;
 
+import com.mybilibili.ai.client.AiChatModelClient;
 import com.mybilibili.ai.client.OllamaClient;
 import com.mybilibili.ai.config.AiProperties;
 import jakarta.annotation.Resource;
@@ -21,6 +22,8 @@ public class AiModelWarmupComponent {
     @Resource
     private OllamaClient ollamaClient;
     @Resource
+    private AiChatModelClient aiChatModelClient;
+    @Resource
     private AiProperties aiProperties;
 
     @Async("aiWarmupExecutor")
@@ -31,13 +34,13 @@ public class AiModelWarmupComponent {
             return;
         }
 
-        // 先加载向量模型，再加载对话模型，保证两类请求第一次进来时都已经走过模型初始化。
+        // 先把本地向量模型拉起来。云端对话预热默认关闭，避免启动阶段消耗额度或被网络抖动拖慢。
         warmupEmbeddingModel("首次加载");
-        warmupChatModel();
-
-        // Ollama 在加载对话模型时可能会调度/卸载刚加载过的向量模型。
-        // 当前建议配置 OLLAMA_MAX_LOADED_MODELS=2，所以最后再轻量请求一次向量模型。
-        warmupEmbeddingModel("驻留确认");
+        if (Boolean.TRUE.equals(aiProperties.getWarmup().getChatEnabled())) {
+            warmupChatModel();
+        } else {
+            log.info("AI 对话模型预热已关闭");
+        }
     }
 
     private void warmupEmbeddingModel(String scene) {
@@ -67,11 +70,13 @@ public class AiModelWarmupComponent {
     private void warmupChatModel() {
         long start = System.currentTimeMillis();
         try {
-            ollamaClient.chat(aiProperties.getWarmup().getChatSystemPrompt(), aiProperties.getWarmup().getChatUserPrompt());
-            log.info("AI 对话模型预热完成, model={}, cost={}ms", aiProperties.getOllama().getChatModel(), System.currentTimeMillis() - start);
+            aiChatModelClient.chat(aiProperties.getWarmup().getChatSystemPrompt(), aiProperties.getWarmup().getChatUserPrompt());
+            log.info("AI 对话模型预热完成, model={}, cost={}ms",
+                    aiProperties.getChatProvider().getModel(), System.currentTimeMillis() - start);
         } catch (Exception e) {
-            // 这里不抛异常，避免 Ollama 暂时没启动时拖垮整个 AI 服务。
-            log.warn("AI 对话模型预热失败, model={}, cost={}ms", aiProperties.getOllama().getChatModel(), System.currentTimeMillis() - start, e);
+            // 对话模型现在走外部 API，预热失败只记录，不影响字幕向量检索和服务启动。
+            log.warn("AI 对话模型预热失败, model={}, cost={}ms",
+                    aiProperties.getChatProvider().getModel(), System.currentTimeMillis() - start, e);
         }
     }
 

@@ -1,5 +1,6 @@
 package com.mybilibili.ai.config;
 
+import com.mybilibili.ai.constants.AiConstants;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMax;
@@ -24,6 +25,8 @@ public class AiProperties {
     @Valid
     private Ollama ollama = new Ollama();
     @Valid
+    private ChatProvider chatProvider = new ChatProvider();
+    @Valid
     private Rag rag = new Rag();
     @Valid
     private Chat chat = new Chat();
@@ -42,6 +45,14 @@ public class AiProperties {
 
     public void setOllama(Ollama ollama) {
         this.ollama = ollama == null ? new Ollama() : ollama;
+    }
+
+    public ChatProvider getChatProvider() {
+        return chatProvider;
+    }
+
+    public void setChatProvider(ChatProvider chatProvider) {
+        this.chatProvider = chatProvider == null ? new ChatProvider() : chatProvider;
     }
 
     public Rag getRag() {
@@ -96,10 +107,13 @@ public class AiProperties {
 
         @NotBlank
         private String baseUrl = "http://127.0.0.1:11434";
+        /**
+         * 本地联调时的兜底 embedding 模型。
+         *
+         * <p>线上和测试环境优先使用 Nacos 等外部配置覆盖，避免仓库默认值和运行环境脱节。</p>
+         */
         @NotBlank
-        private String chatModel = "qwen2.5:3b";
-        @NotBlank
-        private String embeddingModel = "bge-m3-cpu:567m";
+        private String embeddingModel = "bge-m3:567m";
         @NotBlank
         private String keepAlive = "10m";
         @Min(1)
@@ -115,14 +129,6 @@ public class AiProperties {
 
         public void setBaseUrl(String baseUrl) {
             this.baseUrl = baseUrl;
-        }
-
-        public String getChatModel() {
-            return chatModel;
-        }
-
-        public void setChatModel(String chatModel) {
-            this.chatModel = chatModel;
         }
 
         public String getEmbeddingModel() {
@@ -163,6 +169,99 @@ public class AiProperties {
 
         public void setWriteTimeoutSeconds(Integer writeTimeoutSeconds) {
             this.writeTimeoutSeconds = writeTimeoutSeconds;
+        }
+    }
+
+    public static class ChatProvider {
+
+        @NotBlank
+        private String baseUrl = "https://api.openai.com";
+        private String apiKey;
+        @NotBlank
+        private String model = "gpt-4o-mini";
+        @NotBlank
+        private String chatCompletionsPath = AiConstants.OPENAI_CHAT_COMPLETIONS_API_PATH;
+        @Min(1)
+        private Integer connectTimeoutSeconds = 5;
+        @Min(1)
+        private Integer readTimeoutSeconds = 180;
+        @Min(1)
+        private Integer writeTimeoutSeconds = 30;
+        @Min(0)
+        private Integer maxRetries = 1;
+        @Min(0)
+        private Long retryIntervalMs = 1000L;
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+
+        public String getModel() {
+            return model;
+        }
+
+        public void setModel(String model) {
+            this.model = model;
+        }
+
+        public String getChatCompletionsPath() {
+            return chatCompletionsPath;
+        }
+
+        public void setChatCompletionsPath(String chatCompletionsPath) {
+            this.chatCompletionsPath = chatCompletionsPath;
+        }
+
+        public Integer getConnectTimeoutSeconds() {
+            return connectTimeoutSeconds;
+        }
+
+        public void setConnectTimeoutSeconds(Integer connectTimeoutSeconds) {
+            this.connectTimeoutSeconds = connectTimeoutSeconds;
+        }
+
+        public Integer getReadTimeoutSeconds() {
+            return readTimeoutSeconds;
+        }
+
+        public void setReadTimeoutSeconds(Integer readTimeoutSeconds) {
+            this.readTimeoutSeconds = readTimeoutSeconds;
+        }
+
+        public Integer getWriteTimeoutSeconds() {
+            return writeTimeoutSeconds;
+        }
+
+        public void setWriteTimeoutSeconds(Integer writeTimeoutSeconds) {
+            this.writeTimeoutSeconds = writeTimeoutSeconds;
+        }
+
+        public Integer getMaxRetries() {
+            return maxRetries;
+        }
+
+        public void setMaxRetries(Integer maxRetries) {
+            this.maxRetries = maxRetries;
+        }
+
+        public Long getRetryIntervalMs() {
+            return retryIntervalMs;
+        }
+
+        public void setRetryIntervalMs(Long retryIntervalMs) {
+            this.retryIntervalMs = retryIntervalMs;
         }
     }
 
@@ -393,6 +492,8 @@ public class AiProperties {
         private Integer embeddingMaxAttempts = 3;
         @Min(0)
         private Long embeddingRetryIntervalMs = 2000L;
+        @NotNull
+        private Boolean chatEnabled = false;
         @NotBlank
         private String embeddingProbeText = "warmup";
         @NotBlank
@@ -424,6 +525,14 @@ public class AiProperties {
             this.embeddingRetryIntervalMs = embeddingRetryIntervalMs;
         }
 
+        public Boolean getChatEnabled() {
+            return chatEnabled;
+        }
+
+        public void setChatEnabled(Boolean chatEnabled) {
+            this.chatEnabled = chatEnabled;
+        }
+
         public String getEmbeddingProbeText() {
             return embeddingProbeText;
         }
@@ -451,8 +560,40 @@ public class AiProperties {
 
     public static class Es {
 
+        /**
+         * AI 服务连接 Elasticsearch 的地址。
+         *
+         * <p>为了兼容当前项目里 `host:port` 的历史写法，这里直接用一个字符串承载，
+         * 避免再拆成多级配置后和公共模块的读取方式出现偏差。</p>
+         */
+        @NotBlank
+        private String hostPort = "127.0.0.1:9201";
         @NotBlank
         private String subtitleVectorIndexName = "easylive_video_subtitle_vector";
+        /**
+         * 是否在应用启动阶段主动检查并补建字幕向量索引。
+         *
+         * <p>开发环境经常会遇到本地 ES 重建、索引被手工删除等情况，保留自动初始化可以减少手工步骤；
+         * 如果某些环境通过运维脚本统一建索引，也可以显式关闭。</p>
+         */
+        @NotNull
+        private Boolean initEnabled = true;
+        /**
+         * 初始化索引失败时是否直接终止应用启动。
+         *
+         * <p>生产环境如果把字幕检索视为核心链路，可以打开 fail-fast；本地联调更推荐关闭，
+         * 先让服务启动起来，再根据日志单独处理 ES 侧问题。</p>
+         */
+        @NotNull
+        private Boolean failFastOnInitError = false;
+
+        public String getHostPort() {
+            return hostPort;
+        }
+
+        public void setHostPort(String hostPort) {
+            this.hostPort = hostPort;
+        }
 
         public String getSubtitleVectorIndexName() {
             return subtitleVectorIndexName;
@@ -460,6 +601,22 @@ public class AiProperties {
 
         public void setSubtitleVectorIndexName(String subtitleVectorIndexName) {
             this.subtitleVectorIndexName = subtitleVectorIndexName;
+        }
+
+        public Boolean getInitEnabled() {
+            return initEnabled;
+        }
+
+        public void setInitEnabled(Boolean initEnabled) {
+            this.initEnabled = initEnabled;
+        }
+
+        public Boolean getFailFastOnInitError() {
+            return failFastOnInitError;
+        }
+
+        public void setFailFastOnInitError(Boolean failFastOnInitError) {
+            this.failFastOnInitError = failFastOnInitError;
         }
     }
 }

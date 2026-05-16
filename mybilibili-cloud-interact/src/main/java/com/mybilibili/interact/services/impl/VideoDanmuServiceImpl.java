@@ -13,6 +13,7 @@ import com.mybilibili.base.utils.JsonUtils;
 import com.mybilibili.common.component.UserDailyLimitComponent;
 import com.mybilibili.common.redis.RedisUtils;
 import com.mybilibili.common.utils.StringTools;
+import com.mybilibili.interact.component.InteractRedisComponent;
 import com.mybilibili.interact.consumer.VideoInfoClient;
 import com.mybilibili.interact.entity.po.VideoDanmu;
 import com.mybilibili.interact.entity.query.VideoDanmuQuery;
@@ -46,6 +47,9 @@ public class VideoDanmuServiceImpl implements VideoDanmuService {
 
     @Resource
     private RedisUtils<String> redisUtils;
+
+    @Resource
+    private InteractRedisComponent interactRedisComponent;
 
     @Resource
     private VideoDanmuEventProducer videoDanmuEventProducer;
@@ -113,7 +117,12 @@ public class VideoDanmuServiceImpl implements VideoDanmuService {
         if (!canDirectDelete) {
             throw new BusinessException(ResponseCodeEnum.CODE_600);
         }
-        return videoDanmuMapper.deleteByDanmuId(danmuId);
+        Integer count = videoDanmuMapper.deleteByDanmuId(danmuId);
+        if (count != null && count > 0) {
+            // 弹幕删除属于低频管理动作，直接失效该视频分片缓存，比精确匹配 ZSet 成员更稳。
+            interactRedisComponent.deleteVideoDanmuCache(danmu.getVideoId(), danmu.getFileId());
+        }
+        return count;
     }
 
     @Override
@@ -123,11 +132,23 @@ public class VideoDanmuServiceImpl implements VideoDanmuService {
         if (!checkDanmuOpenWithCache(videoDanmu.getVideoId())) {
             throw new BusinessException("弹幕功能已关闭");
         }
+        // 额度必须在入口原子占用，不能等消费者落库后再扣，否则热点视频下会被瞬间打穿限制。
         userDailyLimitComponent.occupyDailyAction(videoDanmu.getUserId(), UserDailyLimitTypeEnum.DANMU);
 
+        VideoDanmuPostEvent event = buildDanmuPostEvent(videoDanmu, videoInfo);
+        VideoDanmu cacheDanmu = buildCacheDanmu(event);
+        // 先写热缓存再投 MQ：接口成功后播放页能马上看到弹幕，MySQL 由消费者最终落库。
+        String cacheValue = interactRedisComponent.saveVideoDanmuCache(cacheDanmu);
+        if (StringTools.isEmpty(cacheValue)) {
+            userDailyLimitComponent.releaseDailyAction(videoDanmu.getUserId(), UserDailyLimitTypeEnum.DANMU);
+            throw new BusinessException(ResponseCodeEnum.CODE_503);
+        }
+
         try {
-            videoDanmuEventProducer.sendDanmuPostEvent(buildDanmuPostEvent(videoDanmu, videoInfo));
+            videoDanmuEventProducer.sendDanmuPostEvent(event);
         } catch (RuntimeException e) {
+            // MQ 投递失败时，入口缓存里的“已发送”状态也要撤掉，避免用户看到一条不会落库的弹幕。
+            interactRedisComponent.removeVideoDanmuCache(event.getVideoId(), event.getFileId(), cacheValue);
             userDailyLimitComponent.releaseDailyAction(videoDanmu.getUserId(), UserDailyLimitTypeEnum.DANMU);
             throw new BusinessException(ResponseCodeEnum.CODE_503);
         }
@@ -138,10 +159,20 @@ public class VideoDanmuServiceImpl implements VideoDanmuService {
         if (!checkDanmuOpenWithCache(videoId)) {
             return Collections.emptyList();
         }
+        // 播放页是高频读场景，优先走 Redis，避免热点视频反复扫 MySQL。
+        List<VideoDanmu> cacheList = interactRedisComponent.loadVideoDanmuCache(videoId, fileId);
+        if (!cacheList.isEmpty()) {
+            return cacheList;
+        }
+
+        // 缓存未命中通常是冷视频或缓存刚过期，回源后立即重建分片缓存。
         VideoDanmuQuery danmuQuery = new VideoDanmuQuery();
         danmuQuery.setFileId(fileId);
         danmuQuery.setVideoId(videoId);
-        return findListByParam(danmuQuery);
+        danmuQuery.setOrderBy("v.time asc");
+        List<VideoDanmu> danmuList = findListByParam(danmuQuery);
+        interactRedisComponent.rebuildVideoDanmuCache(videoId, fileId, danmuList);
+        return danmuList;
     }
 
     private boolean checkDanmuOpen(String videoId) {
@@ -202,6 +233,7 @@ public class VideoDanmuServiceImpl implements VideoDanmuService {
 
     private VideoDanmuPostEvent buildDanmuPostEvent(VideoDanmu videoDanmu, VideoInfoDTO videoInfo) {
         VideoDanmuPostEvent event = new VideoDanmuPostEvent();
+        // eventId 同时承担 MQ 幂等和数据库唯一键职责，不能由前端传入。
         event.setEventId(UUID.randomUUID().toString().replace("-", ""));
         event.setVideoId(videoDanmu.getVideoId());
         // 视频作者必须以后端查询结果为准，前端传归属字段会带来伪造风险。
@@ -214,6 +246,21 @@ public class VideoDanmuServiceImpl implements VideoDanmuService {
         event.setColor(videoDanmu.getColor());
         event.setTime(videoDanmu.getTime());
         return event;
+    }
+
+    private VideoDanmu buildCacheDanmu(VideoDanmuPostEvent event) {
+        VideoDanmu videoDanmu = new VideoDanmu();
+        videoDanmu.setEventId(event.getEventId());
+        videoDanmu.setVideoId(event.getVideoId());
+        videoDanmu.setVideoUserId(event.getVideoUserId());
+        videoDanmu.setFileId(event.getFileId());
+        videoDanmu.setUserId(event.getUserId());
+        videoDanmu.setPostTime(event.getPostTime());
+        videoDanmu.setText(event.getText());
+        videoDanmu.setMode(event.getMode());
+        videoDanmu.setColor(event.getColor());
+        videoDanmu.setTime(event.getTime());
+        return videoDanmu;
     }
 
     private boolean isVideoOwner(String videoId, String userId) {

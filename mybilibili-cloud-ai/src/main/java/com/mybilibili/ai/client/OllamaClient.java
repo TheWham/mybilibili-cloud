@@ -17,20 +17,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 /**
- * Ollama HTTP 客户端。
+ * Ollama 向量模型客户端。
  *
- * <p>这里没有接 Spring AI，是为了避免当前微服务 Spring Boot 3.2.x 和 Spring AI 1.1.x 的版本耦合。</p>
+ * <p>当前只保留本地 bge 向量能力。对话模型已经迁移到 OpenAI 兼容接口，避免把本地聊天模型
+ * 的调用继续揉在业务链路里。</p>
  */
 @Component
 public class OllamaClient {
@@ -63,67 +60,6 @@ public class OllamaClient {
         }
     }
 
-    public String chat(String systemPrompt, String userPrompt) {
-        Map<String, Object> body = buildChatRequest(systemPrompt, userPrompt, false);
-        try {
-            JsonNode root = objectMapper.readTree(postJson(AiConstants.OLLAMA_CHAT_API_PATH, body));
-            String answer = root.path("message").path("content").asText("");
-            if (StringUtils.isBlank(answer)) {
-                throw new BusinessException("AI 模型没有返回回答");
-            }
-            return answer.trim();
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Ollama 对话请求失败, model={}", aiProperties.getOllama().getChatModel(), e);
-            throw new BusinessException("AI 问答模型暂时不可用，请稍后再试", e);
-        }
-    }
-
-    public String streamChat(String systemPrompt, String userPrompt, Consumer<String> deltaConsumer) {
-        Map<String, Object> body = buildChatRequest(systemPrompt, userPrompt, true);
-        StringBuilder answer = new StringBuilder();
-        Request request = buildJsonRequest(AiConstants.OLLAMA_CHAT_API_PATH, body);
-        try (Response response = getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw readHttpException(response);
-            }
-            ResponseBody responseBody = response.body();
-            if (responseBody == null) {
-                throw new BusinessException("AI 模型没有返回回答");
-            }
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(responseBody.byteStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (StringUtils.isBlank(line)) {
-                        continue;
-                    }
-                    JsonNode node = objectMapper.readTree(line);
-                    if (node.hasNonNull("error")) {
-                        throw new BusinessException(node.path("error").asText("AI 问答模型暂时不可用，请稍后再试"));
-                    }
-                    String delta = node.path("message").path("content").asText("");
-                    if (StringUtils.isNotEmpty(delta)) {
-                        answer.append(delta);
-                        deltaConsumer.accept(delta);
-                    }
-                    if (node.path("done").asBoolean(false)) {
-                        break;
-                    }
-                }
-            }
-            if (answer.length() == 0) {
-                throw new BusinessException("AI 模型没有返回回答");
-            }
-            return answer.toString().trim();
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Ollama 流式对话请求失败, model={}", aiProperties.getOllama().getChatModel(), e);
-            throw new BusinessException("AI 问答模型暂时不可用，请稍后再试", e);
-        }
-    }
-
     private List<Double> embedWithLegacyApi(String text) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", aiProperties.getOllama().getEmbeddingModel());
@@ -139,19 +75,6 @@ public class OllamaClient {
     private BusinessException buildEmbeddingException(Exception e) {
         log.error("Ollama 向量请求失败, model={}", aiProperties.getOllama().getEmbeddingModel(), e);
         return new BusinessException("AI 向量模型暂时不可用，请稍后再试", e);
-    }
-
-    private Map<String, Object> buildChatRequest(String systemPrompt, String userPrompt, boolean stream) {
-        List<Map<String, String>> messages = new ArrayList<>(2);
-        messages.add(Map.of("role", "system", "content", systemPrompt));
-        messages.add(Map.of("role", "user", "content", userPrompt));
-
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", aiProperties.getOllama().getChatModel());
-        body.put("messages", messages);
-        body.put("stream", stream);
-        body.put("keep_alive", aiProperties.getOllama().getKeepAlive());
-        return body;
     }
 
     private List<Double> parseEmbeddingResponse(String responseJson) throws Exception {

@@ -4,6 +4,7 @@
 <mapper namespace="com.mybilibili.interact.mappers.VideoDanmuMapper">
     <resultMap id="base_result_map" type="com.mybilibili.interact.entity.po.VideoDanmu">
         <id column="danmu_id" property="danmuId"/>
+        <result column="event_id" property="eventId"/>
         <result column="video_id" property="videoId"/>
         <result column="video_user_id" property="videoUserId"/>
         <result column="file_id" property="fileId"/>
@@ -16,7 +17,7 @@
     </resultMap>
 
     <sql id="base_column_list">
-        v.danmu_id,v.video_id,v.video_user_id,v.file_id,v.user_id,v.post_time,v.text,v.mode,v.color,v.time
+        v.danmu_id,v.event_id,v.video_id,v.video_user_id,v.file_id,v.user_id,v.post_time,v.text,v.mode,v.color,v.time
     </sql>
 
     <sql id="base_query_condition">
@@ -88,6 +89,7 @@
         </selectKey>
         INSERT INTO video_danmu
         <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="bean.eventId != null">event_id,</if>
             <if test="bean.videoId != null">video_id,</if>
             <if test="bean.videoUserId != null">video_user_id,</if>
             <if test="bean.fileId != null">file_id,</if>
@@ -99,6 +101,7 @@
             <if test="bean.time != null">time,</if>
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="bean.eventId != null">#{bean.eventId},</if>
             <if test="bean.videoId != null">#{bean.videoId},</if>
             <if test="bean.videoUserId != null">#{bean.videoUserId},</if>
             <if test="bean.fileId != null">#{bean.fileId},</if>
@@ -115,6 +118,7 @@
         INSERT INTO video_danmu
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="bean.danmuId != null">danmu_id,</if>
+            <if test="bean.eventId != null">event_id,</if>
             <if test="bean.videoId != null">video_id,</if>
             <if test="bean.videoUserId != null">video_user_id,</if>
             <if test="bean.fileId != null">file_id,</if>
@@ -127,6 +131,7 @@
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="bean.danmuId != null">#{bean.danmuId},</if>
+            <if test="bean.eventId != null">#{bean.eventId},</if>
             <if test="bean.videoId != null">#{bean.videoId},</if>
             <if test="bean.videoUserId != null">#{bean.videoUserId},</if>
             <if test="bean.fileId != null">#{bean.fileId},</if>
@@ -139,6 +144,7 @@
         </trim>
         on DUPLICATE key update
         <trim suffixOverrides=",">
+            <if test="bean.eventId != null">event_id = VALUES(event_id),</if>
             <if test="bean.videoId != null">video_id = VALUES(video_id),</if>
             <if test="bean.videoUserId != null">video_user_id = VALUES(video_user_id),</if>
             <if test="bean.fileId != null">file_id = VALUES(file_id),</if>
@@ -152,19 +158,19 @@
     </insert>
 
     <insert id="insertBatch" parameterType="com.mybilibili.interact.entity.po.VideoDanmu" useGeneratedKeys="true" keyProperty="danmuId">
-        INSERT INTO video_danmu(danmu_id,video_id,video_user_id,file_id,user_id,post_time,text,mode,color,time) values
+        INSERT INTO video_danmu(danmu_id,event_id,video_id,video_user_id,file_id,user_id,post_time,text,mode,color,time) values
         <foreach collection="list" item="item" separator=",">
-            (#{item.danmuId},#{item.videoId},#{item.videoUserId},#{item.fileId},#{item.userId},#{item.postTime},#{item.text},#{item.mode},#{item.color},#{item.time})
+            (#{item.danmuId},#{item.eventId},#{item.videoId},#{item.videoUserId},#{item.fileId},#{item.userId},#{item.postTime},#{item.text},#{item.mode},#{item.color},#{item.time})
         </foreach>
     </insert>
 
     <insert id="insertOrUpdateBatch" parameterType="com.mybilibili.interact.entity.po.VideoDanmu">
-        INSERT INTO video_danmu(danmu_id,video_id,video_user_id,file_id,user_id,post_time,text,mode,color,time) values
+        INSERT INTO video_danmu(danmu_id,event_id,video_id,video_user_id,file_id,user_id,post_time,text,mode,color,time) values
         <foreach collection="list" item="item" separator=",">
-            (#{item.danmuId},#{item.videoId},#{item.videoUserId},#{item.fileId},#{item.userId},#{item.postTime},#{item.text},#{item.mode},#{item.color},#{item.time})
+            (#{item.danmuId},#{item.eventId},#{item.videoId},#{item.videoUserId},#{item.fileId},#{item.userId},#{item.postTime},#{item.text},#{item.mode},#{item.color},#{item.time})
         </foreach>
         on DUPLICATE key update
-        video_id = VALUES(video_id),video_user_id = VALUES(video_user_id),file_id = VALUES(file_id),user_id = VALUES(user_id),post_time = VALUES(post_time),text = VALUES(text),mode = VALUES(mode),color = VALUES(color),time = VALUES(time)
+        event_id = VALUES(event_id),video_id = VALUES(video_id),video_user_id = VALUES(video_user_id),file_id = VALUES(file_id),user_id = VALUES(user_id),post_time = VALUES(post_time),text = VALUES(text),mode = VALUES(mode),color = VALUES(color),time = VALUES(time)
     </insert>
 
     <select id="selectByDanmuId" resultMap="base_result_map">
@@ -179,6 +185,7 @@
     <update id="updateByDanmuId" parameterType="com.mybilibili.interact.entity.po.VideoDanmu">
         UPDATE video_danmu
         <set>
+            <if test="bean.eventId != null">event_id = #{bean.eventId},</if>
             <if test="bean.videoId != null">video_id = #{bean.videoId},</if>
             <if test="bean.videoUserId != null">video_user_id = #{bean.videoUserId},</if>
             <if test="bean.fileId != null">file_id = #{bean.fileId},</if>

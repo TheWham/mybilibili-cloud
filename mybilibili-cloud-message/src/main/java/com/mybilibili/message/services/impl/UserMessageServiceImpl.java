@@ -18,6 +18,7 @@ import com.mybilibili.message.entity.dto.UserMessageExtendDTO;
 import com.mybilibili.message.entity.po.UserMessage;
 import com.mybilibili.message.entity.query.UserMessageQuery;
 import com.mybilibili.message.entity.vo.MessageNoticeVO;
+import com.mybilibili.message.entity.vo.MessageTypeDataVO;
 import com.mybilibili.message.mappers.UserMessageMapper;
 import com.mybilibili.message.services.UserMessageService;
 import jakarta.annotation.Resource;
@@ -152,6 +153,22 @@ public class UserMessageServiceImpl implements UserMessageService {
 	@Override
 	public Integer getNoReadMessageCount(UserMessageQuery messageQuery) {
 		return this.userMessageMapper.selectCount(messageQuery);
+	}
+
+	/**
+	 * 按消息类型统计未读数量。
+	 *
+	 * <p>消息中心入口会频繁刷新未读角标，直接查聚合结果比先拉全量未读消息再在 Java 里分组更稳。</p>
+	 *
+	 * @param messageQuery 未读统计条件
+	 * @return 每种消息类型对应的未读数量
+	 */
+	@Override
+	public List<MessageTypeDataVO> getNoReadMessageCountGroup(UserMessageQuery messageQuery) {
+		if (messageQuery == null) {
+			return Collections.emptyList();
+		}
+		return this.userMessageMapper.selectNoReadCountGroup(messageQuery);
 	}
 
 	@Override
@@ -306,7 +323,7 @@ public class UserMessageServiceImpl implements UserMessageService {
 		int updateCount = 0;
 
 		// 点赞、收藏这类消息不按“每次点击一条流水”保存。
-		// 同一个发送人反复对同一个视频操作时，消息中心只保留一条，新的触发只刷新时间。
+		// 同一个发送人反复对同一个视频操作时，只刷新原通知；评论、回复仍然保留流水，避免漏掉真实互动。
 		Map<String, UserMessage> dedupMessageMap = messageList.stream()
 				.filter(Objects::nonNull)
 				.collect(Collectors.toMap(this::buildMessageDedupKey, message -> message, this::pickLatestMessage, LinkedHashMap::new));

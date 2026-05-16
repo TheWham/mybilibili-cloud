@@ -43,9 +43,13 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -157,7 +161,19 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 		return this.videoInfoMapper.insertOrUpdate(videoBean);
 	}
 
+	/**
+	 * 管理员审核视频投稿。
+	 *
+	 * <p>这里把事务边界收在 Service 层，Controller 只负责接参。审核主链路只处理
+	 * MySQL 中的业务事实；依赖提交结果的通知、索引、AI 任务、文件清理统一挂到
+	 * afterCommit，避免出现数据库回滚但副作用先执行的问题。</p>
+	 *
+	 * @param videoId 视频 ID
+	 * @param status  审核状态，只允许审核通过或审核驳回
+	 * @param reason  驳回原因，审核通过时允许为空
+	 */
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public void auditVideo(String videoId, Integer status, String reason) {
 		//校验参数
 		VideoInfoPost videoInfoPost = this.videoInfoPostMapper.selectByVideoId(videoId);
@@ -176,9 +192,8 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 		if (updateCount == 0)
 			throw new BusinessException("正式表更新失败");
 
-		if (status.equals(VideoStatusEnum.STATUS_4.getStatus()))
-		{
-			userMessageEventProducer.sendAuditVideoMessage(videoInfoPost, status, reason);
+		if (status.equals(VideoStatusEnum.STATUS_4.getStatus())) {
+			registerAfterCommit(() -> userMessageEventProducer.sendAuditVideoMessage(videoInfoPost, status, reason));
 			return;
 		}
 
@@ -190,7 +205,7 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 		videoInfoFilePostMapper.updateByCondition(videoInfoFilePost, filePostQuery);
 
 		//同步信息到正式表
-		VideoInfo videoInfo = this.getVideoInfoByVideoId(videoId);
+		VideoInfo videoInfo = this.videoInfoMapper.selectByVideoId(videoId);
 		boolean firstAuditPass = videoInfo == null;
 
 		videoInfo = BeanUtil.toBean(videoInfoPost, VideoInfo.class);
@@ -207,39 +222,20 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 		videoInfoFileMapper.insertOrUpdateBatch(videoInfoFiles);
 
 
+		Integer auditRewardCoinCount = null;
 		if (firstAuditPass) {
 			SysSettingDTO sysSetting = videoRedisComponent.getSysSetting();
-			Integer rewardCoinCount = sysSetting.getPostVideoCoinCount();
-
-			// 首次审核通过才发发布奖励。
-			// 这里不直接改 MySQL，而是先补 Redis 实时值，再丢到异步队列里统一刷库，
-			// 这样和你项目里其他互动计数的落库方式保持一致，前台也能马上读到新硬币数。
-			videoRedisComponent.addVideoAuditReward(videoInfoPost.getUserId(), videoId, rewardCoinCount);
+			auditRewardCoinCount = sysSetting.getPostVideoCoinCount();
 		}
 
-		//清楚更新时候被删除的文件
+		// 这里只读取待删目录清单，真正的物理删除放到事务提交之后，避免文件删掉了事务却回滚。
 		List<String> deleteFilePathList = videoRedisComponent.getDelFilePathsQueue(videoId);
-		if (deleteFilePathList != null && !deleteFilePathList.isEmpty()) {
-			deleteFilePathList.forEach(filePath -> {
-				String completeFilePath = adminConfig.getProjectFolder() + Constants.FILE_PATH_FOLDER + filePath;
-				File file = new File(completeFilePath);
-				if (file.exists()) {
-					try {
-						FileUtils.deleteDirectory(file);
-					} catch (IOException e) {
-						log.error("删除文件失败");
-					}
-				}
-			});
-		}
-
-
-		//清空缓存
 		videoRedisComponent.cleanDelFilePaths(videoId);
-		// 正式表写完后，把搜索索引交给 search 服务维护，video 不再直接操作 ES。
-		searchVideoClient.saveVideoDoc(BeanUtil.toBean(videoInfo, VideoInfoDTO.class));
-		enqueueAiSubtitleIndexTasks(videoInfo, filePostList);
-		userMessageEventProducer.sendAuditVideoMessage(videoInfoPost, status, reason);
+		VideoInfo auditedVideoInfo = videoInfo;
+		List<VideoInfoFilePost> auditedFilePostList = filePostList;
+		Integer auditedRewardCoinCount = auditRewardCoinCount;
+		registerAfterCommit(() -> handleAuditPassAfterCommit(auditedVideoInfo, auditedFilePostList,
+				videoInfoPost, status, reason, auditedRewardCoinCount, deleteFilePathList));
 	}
 
 	@Override
@@ -403,13 +399,82 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 		return Math.max(value, 0);
 	}
 
+	/**
+	 * 审核通过后的提交后处理。
+	 *
+	 * <p>这里只有“提交之后才能做”的事情：发奖励、同步搜索索引、投递 AI 字幕任务、
+	 * 发送站内信以及清理旧文件。任何一个分支失败都只记日志，不反向影响审核结果。</p>
+	 */
+	private void handleAuditPassAfterCommit(VideoInfo videoInfo,
+											List<VideoInfoFilePost> filePostList,
+											VideoInfoPost videoInfoPost,
+											Integer status,
+											String reason,
+											Integer rewardCoinCount,
+											List<String> deleteFilePathList) {
+		addVideoAuditRewardSilently(videoInfoPost.getUserId(), videoInfoPost.getVideoId(), rewardCoinCount);
+		saveVideoDocSilently(videoInfo);
+		enqueueAiSubtitleIndexTasks(videoInfo, filePostList);
+		deleteAuditRemovedFilesSilently(deleteFilePathList);
+		userMessageEventProducer.sendAuditVideoMessage(videoInfoPost, status, reason);
+	}
+
+	/**
+	 * 删除审核通过前被用户替换掉的旧目录。
+	 *
+	 * <p>这里做的是磁盘 IO，不应该占着数据库事务。等事务提交成功后再删，即使删除失败，
+	 * 也只是留下可人工清理的旧文件，不会破坏正式数据。</p>
+	 *
+	 * @param deleteFilePathList Redis 中记录的待删目录列表
+	 */
+	private void deleteAuditRemovedFilesSilently(List<String> deleteFilePathList) {
+		if (deleteFilePathList == null || deleteFilePathList.isEmpty()) {
+			return;
+		}
+		for (String filePath : deleteFilePathList) {
+			String completeFilePath = adminConfig.getProjectFolder() + Constants.FILE_PATH_FOLDER + filePath;
+			File file = new File(completeFilePath);
+			if (!file.exists()) {
+				continue;
+			}
+			try {
+				FileUtils.deleteDirectory(file);
+			} catch (IOException e) {
+				log.error("删除审核遗留文件失败, filePath={}", completeFilePath, e);
+			}
+		}
+	}
+
+	private void addVideoAuditRewardSilently(String userId, String videoId, Integer rewardCoinCount) {
+		if (rewardCoinCount == null || rewardCoinCount <= 0) {
+			return;
+		}
+		try {
+			// 首次审核通过才发发布奖励，等事务提交后再补 Redis 和 MQ，避免审核回滚后用户硬币已经变化。
+			videoRedisComponent.addVideoAuditReward(userId, videoId, rewardCoinCount);
+		} catch (Exception e) {
+			log.error("投递视频审核奖励失败, userId={}, videoId={}, rewardCoinCount={}",
+					userId, videoId, rewardCoinCount, e);
+		}
+	}
+
+	private void saveVideoDocSilently(VideoInfo videoInfo) {
+		try {
+			// 正式表写完后，把搜索索引交给 search 服务维护，video 不再直接操作 ES。
+			searchVideoClient.saveVideoDoc(BeanUtil.toBean(videoInfo, VideoInfoDTO.class));
+		} catch (Exception e) {
+			// 搜索索引是审核后的读侧数据，失败时记录日志，后续可以用重建索引补偿。
+			log.error("同步视频搜索索引失败, videoId={}", videoInfo == null ? null : videoInfo.getVideoId(), e);
+		}
+	}
+
 	private void enqueueAiSubtitleIndexTasks(VideoInfo videoInfo, List<VideoInfoFilePost> filePostList) {
 		if (videoInfo == null || filePostList == null || filePostList.isEmpty()) {
 			return;
 		}
 		try {
-			aiSubtitleVectorClient.deleteByVideoId(videoInfo.getVideoId());
-			int taskCount = 0;
+			deleteAiSubtitleVectorSilently(videoInfo.getVideoId());
+			List<AiSubtitleIndexTaskDTO> taskList = new ArrayList<>();
 			for (VideoInfoFilePost filePost : filePostList) {
 				String sourceVideoPath = adminConfig.getProjectFolder()
 						+ Constants.FILE_PATH_FOLDER
@@ -431,13 +496,51 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 				task.setFileId(filePost.getFileId());
 				task.setFileIndex(filePost.getFileIndex());
 				task.setSourceVideoPath(sourceVideoPath);
-				videoRedisComponent.addAiSubtitleIndexTask(task);
-				taskCount++;
+				taskList.add(task);
 			}
-			log.info("视频字幕向量化任务投递完成, videoId={}, count={}", videoInfo.getVideoId(), taskCount);
+			if (taskList.isEmpty()) {
+				log.warn("视频字幕向量化任务为空, videoId={}", videoInfo.getVideoId());
+				return;
+			}
+
+			videoRedisComponent.initAiSubtitleIndexStatus(videoInfo.getVideoId(), taskList.size());
+			for (AiSubtitleIndexTaskDTO task : taskList) {
+				videoRedisComponent.addAiSubtitleIndexTask(task);
+			}
+			log.info("视频字幕向量化任务投递完成, videoId={}, count={}", videoInfo.getVideoId(), taskList.size());
 		} catch (Exception e) {
 			// 字幕向量化是审核后的增强链路，不能因为 AI 队列或 ES 异常影响审核主流程。
 			log.error("投递字幕向量化任务失败, videoId={}", videoInfo.getVideoId(), e);
 		}
+	}
+
+	private void deleteAiSubtitleVectorSilently(String videoId) {
+		try {
+			aiSubtitleVectorClient.deleteByVideoId(videoId);
+		} catch (Exception e) {
+			// 删除旧向量失败不能阻断新任务投递，否则 worker 在线也没有机会重建索引。
+			log.error("删除旧字幕向量失败, videoId={}", videoId, e);
+		}
+	}
+
+	/**
+	 * 注册事务提交后的回调。
+	 *
+	 * <p>审核、转码这类链路对提交时机很敏感，所以这里不做“没有事务就直接执行”的降级。
+	 * 一旦脱离事务调用，宁可尽早报错，也不能把 afterCommit 语义悄悄改成立即执行。</p>
+	 *
+	 * @param task 提交成功后需要执行的任务
+	 */
+	private void registerAfterCommit(Runnable task) {
+		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+			log.error("afterCommit任务注册失败，当前线程没有可用事务, task={}", task);
+			throw new IllegalStateException("当前线程没有可用事务，不能注册 afterCommit 任务");
+		}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				task.run();
+			}
+		});
 	}
 }

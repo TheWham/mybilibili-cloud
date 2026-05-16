@@ -4,15 +4,20 @@ import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.UserActionSyncDTO;
 import com.mybilibili.base.enums.UserStatsRedisEnum;
 import com.mybilibili.common.redis.RedisUtils;
+import com.mybilibili.base.utils.JsonUtils;
 import com.mybilibili.interact.constants.InteractRedisKeys;
+import com.mybilibili.interact.entity.po.VideoDanmu;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * interact 服务缓存组件。
@@ -22,6 +27,22 @@ import java.util.Map;
  */
 @Component
 public class InteractRedisComponent {
+
+    /**
+     * 单个视频分片最多缓存的弹幕数量。
+     *
+     * <p>热点视频弹幕量很大，ZSet 不能无限长；超过上限后按时间轴裁掉最早的一段，
+     * 保住当前播放页最常访问的热数据。</p>
+     */
+    private static final int DANMU_CACHE_MAX_SIZE = 5000;
+
+    /**
+     * 弹幕热缓存有效期。
+     *
+     * <p>播放页会频繁刷新弹幕，30 分钟能覆盖大多数热点观看窗口；
+     * 冷视频缓存过期后再从 MySQL 回源即可。</p>
+     */
+    private static final long DANMU_CACHE_TTL = 30L * Constants.REDIS_EXPIRE_TIME_ONE_MINUTE;
 
     @Resource
     private RedisUtils redisUtils;
@@ -152,11 +173,82 @@ public class InteractRedisComponent {
         return resultMap;
     }
 
+    public String saveVideoDanmuCache(VideoDanmu videoDanmu) {
+        if (videoDanmu == null || videoDanmu.getVideoId() == null || videoDanmu.getFileId() == null) {
+            return null;
+        }
+        String cacheKey = buildVideoDanmuCacheKey(videoDanmu.getVideoId(), videoDanmu.getFileId());
+        String cacheValue = JsonUtils.convertObj2Json(videoDanmu);
+        // score 使用弹幕出现时间，loadDanmu 读取时就不用再在 Java 里额外排序。
+        boolean success = redisUtils.zadd(cacheKey, cacheValue, videoDanmu.getTime(), DANMU_CACHE_TTL);
+        if (!success) {
+            return null;
+        }
+        trimDanmuCache(cacheKey);
+        return cacheValue;
+    }
+
+    public List<VideoDanmu> loadVideoDanmuCache(String videoId, String fileId) {
+        Set<Object> cacheValueSet = redisUtils.zrange(buildVideoDanmuCacheKey(videoId, fileId), 0, -1);
+        if (cacheValueSet == null || cacheValueSet.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<VideoDanmu> resultList = new ArrayList<>(cacheValueSet.size());
+        for (Object cacheValue : cacheValueSet) {
+            if (cacheValue == null) {
+                continue;
+            }
+            // Redis 里存完整弹幕 JSON，避免播放页回源时还要拼装多个字段。
+            VideoDanmu videoDanmu = JsonUtils.convertJson2Obj(cacheValue.toString(), VideoDanmu.class);
+            if (videoDanmu != null) {
+                resultList.add(videoDanmu);
+            }
+        }
+        return resultList;
+    }
+
+    public void rebuildVideoDanmuCache(String videoId, String fileId, List<VideoDanmu> danmuList) {
+        String cacheKey = buildVideoDanmuCacheKey(videoId, fileId);
+        // 回源重建前先删旧缓存，避免 MySQL 老数据和刚查询结果混在一个分片里。
+        redisUtils.delete(cacheKey);
+        if (danmuList == null || danmuList.isEmpty()) {
+            return;
+        }
+        for (VideoDanmu videoDanmu : danmuList) {
+            saveVideoDanmuCache(videoDanmu);
+        }
+    }
+
+    public void removeVideoDanmuCache(String videoId, String fileId, String cacheValue) {
+        if (cacheValue == null) {
+            return;
+        }
+        redisUtils.zremove(buildVideoDanmuCacheKey(videoId, fileId), cacheValue);
+    }
+
+    public void deleteVideoDanmuCache(String videoId, String fileId) {
+        redisUtils.delete(buildVideoDanmuCacheKey(videoId, fileId));
+    }
+
+    private void trimDanmuCache(String cacheKey) {
+        Long cacheSize = redisUtils.getZSetSize(cacheKey);
+        if (cacheSize == null || cacheSize <= DANMU_CACHE_MAX_SIZE) {
+            return;
+        }
+        // ZSet 正序排列，rank 小的是较早时间点的弹幕，优先裁掉这部分冷数据。
+        redisUtils.zremRangeByRank(cacheKey, 0, cacheSize - DANMU_CACHE_MAX_SIZE - 1);
+    }
+
     private String buildVideoActionStatusKey(String userId, String videoId, Integer actionType) {
         return InteractRedisKeys.VIDEO_ACTION_STATUS_KEY + userId + ":" + videoId + ":" + actionType;
     }
 
     private String buildCommentActionStatusKey(String userId, Integer commentId) {
         return InteractRedisKeys.COMMENT_ACTION_STATUS_KEY + userId + ":" + commentId;
+    }
+
+    private String buildVideoDanmuCacheKey(String videoId, String fileId) {
+        return InteractRedisKeys.VIDEO_DANMU_CACHE + videoId + ":" + fileId;
     }
 }

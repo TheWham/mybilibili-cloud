@@ -14,11 +14,7 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * @author amani
@@ -72,28 +68,8 @@ public class UserMessageController extends ABaseController {
 		UserMessageQuery messageQuery = new UserMessageQuery();
 		messageQuery.setReadType(MessageReadTypeEnum.NO_READ.getType());
 		messageQuery.setUserId(getTokenUserInfo().getUserId());
-		List<UserMessage> list = userMessageService.findListByParam(messageQuery);
-
-		if (list == null || list.isEmpty())
-			return getSuccessResponseVO(Collections.emptyMap());
-
-		Map<Integer, Integer> typeCountMap = list.stream()
-				.filter(item -> item.getReadType() == 0)
-				.collect(Collectors.toMap(
-						UserMessage::getMessageType,
-						item -> 1,
-						Integer::sum
-				));
-
-		List<MessageTypeDataVO> dataVOList = new ArrayList<>(typeCountMap.size());
-
-		for (UserMessage userMessage : list) {
-			MessageTypeDataVO messageTypeDataVO = new MessageTypeDataVO();
-			messageTypeDataVO.setMessageType(userMessage.getMessageType());
-			messageTypeDataVO.setMessageCount(typeCountMap.get(userMessage.getMessageType()));
-			dataVOList.add(messageTypeDataVO);
-		}
-
+		// 未读分组只需要类型和数量，直接让数据库聚合，避免用户未读多时把整批消息拉进内存。
+		List<MessageTypeDataVO> dataVOList = userMessageService.getNoReadMessageCountGroup(messageQuery);
 		return getSuccessResponseVO(dataVOList);
 	}
 

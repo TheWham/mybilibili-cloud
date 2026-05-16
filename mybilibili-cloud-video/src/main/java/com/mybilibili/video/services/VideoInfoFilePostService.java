@@ -1,5 +1,6 @@
 package com.mybilibili.video.services;
 
+import com.mybilibili.base.entity.event.VideoTransferEvent;
 import com.mybilibili.video.entity.po.VideoInfoFilePost;
 import com.mybilibili.video.entity.query.VideoInfoFilePostQuery;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
@@ -76,7 +77,12 @@ public interface VideoInfoFilePostService {
 	 */
 	Integer deleteVideoInfoFilePostByUploadIdAndUserId(String uploadId, String userId);
 
-    void transferVideo(VideoInfoFilePost transferVideo);
+    /**
+     * 异步执行分 P 转码任务。
+     *
+     * @param transferEvent 转码消息
+     */
+    void transferVideo(VideoTransferEvent transferEvent);
 
     void deleVideo(String videoId, String userId, Boolean isAdmin);
 }

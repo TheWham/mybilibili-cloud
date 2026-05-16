@@ -13,16 +13,20 @@ from elasticsearch import Elasticsearch, helpers
 
 
 QUEUE_KEY = os.getenv("EASYLIVE_AI_QUEUE", "easylive:queue:ai:subtitle-vector")
+DEAD_QUEUE_KEY = os.getenv("EASYLIVE_AI_DEAD_QUEUE", "easylive:queue:ai:subtitle-vector:dead")
+STATUS_KEY_PREFIX = os.getenv("EASYLIVE_AI_STATUS_PREFIX", "easylive:ai:subtitle-vector:status:")
 REDIS_URL = os.getenv("EASYLIVE_REDIS_URL", "redis://127.0.0.1:6379/0")
 ES_URL = os.getenv("EASYLIVE_ES_URL", "http://127.0.0.1:9201")
 ES_INDEX = os.getenv("EASYLIVE_ES_INDEX", "easylive_video_subtitle_vector")
-# 默认使用 CPU 专用的 embedding 模型别名。
-# 这样 Worker 做字幕向量化时不会抢占显存，避免影响 Web 侧 qwen2.5:3b 的响应速度。
-EMBEDDING_MODEL = os.getenv("EASYLIVE_EMBEDDING_MODEL", "bge-m3-cpu:567m")
+# 默认直接使用标准版 bge-m3 模型名。
+# Ollama 会在真正生成 embedding 时按需加载模型，是否继续占用显存由 keep_alive 决定。
+EMBEDDING_MODEL = os.getenv("EASYLIVE_EMBEDDING_MODEL", "bge-m3:567m")
 WHISPER_MODEL = os.getenv("EASYLIVE_WHISPER_MODEL", "small")
 WHISPER_DEVICE = os.getenv("EASYLIVE_WHISPER_DEVICE", "cuda")
-WHISPER_COMPUTE_TYPE = os.getenv("EASYLIVE_WHISPER_COMPUTE_TYPE", "float16")
+# 3050 Ti 这类 4GB 显卡更适合 int8_float16，能兼顾速度和显存占用。
+WHISPER_COMPUTE_TYPE = os.getenv("EASYLIVE_WHISPER_COMPUTE_TYPE", "int8_float16")
 REDIS_BLOCK_SECONDS = int(os.getenv("EASYLIVE_REDIS_BLOCK_SECONDS", "5"))
+MAX_RETRY_COUNT = int(os.getenv("EASYLIVE_AI_MAX_RETRY_COUNT", "3"))
 EXTRA_NVIDIA_DLL_DIRS = os.getenv("EASYLIVE_NVIDIA_DLL_DIRS", "")
 
 
@@ -106,6 +110,115 @@ def build_es_client():
     return Elasticsearch(ES_URL)
 
 
+def now_text():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def build_status_key(task):
+    return STATUS_KEY_PREFIX + task["videoId"]
+
+
+def mark_task_processing(redis_client, task):
+    # video 服务只负责投递任务，worker 取到任务后立刻回写状态，后台列表才能看到真实进度。
+    redis_client.hset(
+        build_status_key(task),
+        mapping={
+            "status": "PROCESSING",
+            "statusName": "处理中",
+            "lastError": "",
+            "updateTime": now_text(),
+        },
+    )
+
+
+def mark_task_success(redis_client, task):
+    status_key = build_status_key(task)
+    success_count = redis_client.hincrby(status_key, "successCount", 1)
+    task_count = int(redis_client.hget(status_key, "taskCount") or 0)
+    update_mapping = {
+        "lastError": "",
+        "updateTime": now_text(),
+    }
+    if task_count > 0 and success_count >= task_count:
+        update_mapping["status"] = "SUCCESS"
+        update_mapping["statusName"] = "成功"
+    redis_client.hset(status_key, mapping=update_mapping)
+
+
+def mark_task_retry(redis_client, task, error, retry_count):
+    redis_client.hset(
+        build_status_key(task),
+        mapping={
+            "status": "PENDING",
+            "statusName": "排队中",
+            "retryCount": retry_count,
+            "lastError": str(error)[:1000],
+            "updateTime": now_text(),
+        },
+    )
+
+
+def mark_task_failed(redis_client, task, error, retry_count):
+    status_key = build_status_key(task)
+    redis_client.hincrby(status_key, "failedCount", 1)
+    redis_client.hset(
+        status_key,
+        mapping={
+            "status": "FAILED",
+            "statusName": "失败",
+            "retryCount": retry_count,
+            "lastError": str(error)[:1000],
+            "updateTime": now_text(),
+        },
+    )
+
+
+def requeue_or_dead_letter(redis_client, task_json, error):
+    try:
+        task = json.loads(task_json)
+    except Exception:
+        redis_client.lpush(
+            DEAD_QUEUE_KEY,
+            json.dumps(
+                {
+                    "rawTask": task_json,
+                    "lastError": str(error)[:1000],
+                    "updateTime": now_text(),
+                },
+                ensure_ascii=False,
+            ),
+        )
+        logger.error("字幕向量化任务 JSON 非法，已进入死信队列, task=%s", task_json)
+        return
+
+    retry_count = int(task.get("retryCount") or 0) + 1
+    task["retryCount"] = retry_count
+    task["lastError"] = str(error)[:1000]
+    task["updateTime"] = now_text()
+    retry_task_json = json.dumps(task, ensure_ascii=False)
+
+    if retry_count <= MAX_RETRY_COUNT:
+        mark_task_retry(redis_client, task, error, retry_count)
+        redis_client.lpush(QUEUE_KEY, retry_task_json)
+        logger.warning(
+            "字幕向量化任务失败，已重新入队, videoId=%s, fileId=%s, retry=%s/%s",
+            task.get("videoId"),
+            task.get("fileId"),
+            retry_count,
+            MAX_RETRY_COUNT,
+        )
+        return
+
+    mark_task_failed(redis_client, task, error, retry_count)
+    redis_client.lpush(DEAD_QUEUE_KEY, retry_task_json)
+    logger.error(
+        "字幕向量化任务超过最大重试次数，已进入死信队列, videoId=%s, fileId=%s, retry=%s",
+        task.get("videoId"),
+        task.get("fileId"),
+        retry_count,
+    )
+
+
 def get_text_embedding(text):
     response = ollama.embeddings(model=EMBEDDING_MODEL, prompt=text)
     vector = response.get("embedding")
@@ -177,8 +290,9 @@ def delete_source_video(task):
         logger.info("已删除字幕处理源文件, path=%s", source_video)
 
 
-def handle_task(model, es_client, task_json):
+def handle_task(model, es_client, redis_client, task_json):
     task = json.loads(task_json)
+    mark_task_processing(redis_client, task)
     start = time.time()
     docs = transcribe_and_embed(model, task)
     success_count = index_docs(es_client, docs)
@@ -192,6 +306,7 @@ def handle_task(model, es_client, task_json):
         success_count,
         time.time() - start,
     )
+    mark_task_success(redis_client, task)
 
 
 def main():
@@ -203,7 +318,13 @@ def main():
 
     model = load_whisper_model(WhisperModel, WHISPER_DEVICE, WHISPER_COMPUTE_TYPE)
     current_device = WHISPER_DEVICE
-    logger.info("AI Worker 启动完成, queue=%s, esIndex=%s", QUEUE_KEY, ES_INDEX)
+    logger.info(
+        "AI Worker 启动完成, queue=%s, deadQueue=%s, esIndex=%s, maxRetry=%s",
+        QUEUE_KEY,
+        DEAD_QUEUE_KEY,
+        ES_INDEX,
+        MAX_RETRY_COUNT,
+    )
 
     while True:
         item = redis_client.brpop(QUEUE_KEY, timeout=REDIS_BLOCK_SECONDS)
@@ -211,7 +332,7 @@ def main():
             continue
         _queue, task_json = item
         try:
-            handle_task(model, es_client, task_json)
+            handle_task(model, es_client, redis_client, task_json)
         except RuntimeError as error:
             if current_device.lower() != "cpu" and is_cuda_runtime_error(error):
                 logger.warning(
@@ -220,14 +341,16 @@ def main():
                 model = load_whisper_model(WhisperModel, "cpu", "int8")
                 current_device = "cpu"
                 try:
-                    handle_task(model, es_client, task_json)
-                except Exception:
+                    handle_task(model, es_client, redis_client, task_json)
+                except Exception as retry_error:
                     logger.exception("CPU 重试后字幕向量化仍失败, task=%s", task_json)
+                    requeue_or_dead_letter(redis_client, task_json, retry_error)
                 continue
             logger.exception("字幕向量化任务失败, task=%s", task_json)
-        except Exception:
-            # 第一版先不做死信队列，避免坏任务阻塞队列；日志里保留完整任务方便人工重投。
+            requeue_or_dead_letter(redis_client, task_json, error)
+        except Exception as error:
             logger.exception("字幕向量化任务失败, task=%s", task_json)
+            requeue_or_dead_letter(redis_client, task_json, error)
 
 
 if __name__ == "__main__":

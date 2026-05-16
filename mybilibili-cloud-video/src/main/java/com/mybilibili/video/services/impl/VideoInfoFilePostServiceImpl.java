@@ -4,6 +4,7 @@ import com.mybilibili.video.component.VideoRedisComponent;
 import com.mybilibili.common.config.AdminConfig;
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.UploadingFileDTO;
+import com.mybilibili.base.entity.event.VideoTransferEvent;
 import com.mybilibili.video.entity.po.VideoInfo;
 import com.mybilibili.video.entity.po.VideoInfoFile;
 import com.mybilibili.video.entity.po.VideoInfoFilePost;
@@ -184,14 +185,39 @@ public class VideoInfoFilePostServiceImpl implements VideoInfoFilePostService {
 	}
 
 	@Override
-	public void transferVideo(VideoInfoFilePost transferVideo){
-		VideoInfoFilePost updateFilePost = new VideoInfoFilePost();
-		try {
-			String key = Constants.REDIS_WEB_UPLOADING_FILE_INFO_KEY + transferVideo.getUserId() + transferVideo.getUploadId();
-			UploadingFileDTO uploadFileInfo = videoRedisComponent.getUploadFileInfo(key);
-			String tempFilePath = adminConfig.getProjectFolder() + Constants.FILE_PATH_FOLDER + Constants.FILE_PATH_FOLDER_TEMP + uploadFileInfo.getFilePath();
-			String targetFilePath = adminConfig.getProjectFolder() + Constants.FILE_PATH_FOLDER + Constants.FILE_PATH_FOLDER_VIDEO + uploadFileInfo.getFilePath();
-			File targetFile = new File(targetFilePath);
+    public void transferVideo(VideoTransferEvent transferEvent){
+        if (transferEvent == null || transferEvent.getFileId() == null) {
+            return;
+        }
+        VideoInfoFilePost transferVideo = videoInfoFilePostMapper.selectByFileId(transferEvent.getFileId());
+        if (transferVideo == null && transferEvent.getUploadId() != null && transferEvent.getUserId() != null) {
+            // 兼容 fileId 缺失或历史脏消息，按 uploadId + userId 再兜底查一次。
+            transferVideo = videoInfoFilePostMapper.selectByUploadIdAndUserId(transferEvent.getUploadId(),
+                    transferEvent.getUserId());
+        }
+        if (transferVideo == null) {
+            log.warn("转码任务对应的分 P 记录不存在, event={}", transferEvent);
+            return;
+        }
+        // 已经不是转码中的任务时直接跳过，避免 MQ 重投导致重复执行 ffmpeg。
+        if (!VideoFileTransferResultEnum.TRANSFER.getStatus().equals(transferVideo.getTransferResult())) {
+            log.info("转码任务已处理或状态已变化, fileId={}, transferResult={}",
+                    transferVideo.getFileId(), transferVideo.getTransferResult());
+            return;
+        }
+        VideoInfoFilePost updateFilePost = new VideoInfoFilePost();
+        try {
+            String key = Constants.REDIS_WEB_UPLOADING_FILE_INFO_KEY + transferVideo.getUserId() + transferVideo.getUploadId();
+            UploadingFileDTO uploadFileInfo = videoRedisComponent.getUploadFileInfo(key);
+            if (uploadFileInfo == null) {
+                log.warn("上传文件元数据不存在, fileId={}, uploadId={}, userId={}",
+                        transferVideo.getFileId(), transferVideo.getUploadId(), transferVideo.getUserId());
+                updateFilePost.setTransferResult(VideoFileTransferResultEnum.FAILED.getStatus());
+                return;
+            }
+            String tempFilePath = adminConfig.getProjectFolder() + Constants.FILE_PATH_FOLDER + Constants.FILE_PATH_FOLDER_TEMP + uploadFileInfo.getFilePath();
+            String targetFilePath = adminConfig.getProjectFolder() + Constants.FILE_PATH_FOLDER + Constants.FILE_PATH_FOLDER_VIDEO + uploadFileInfo.getFilePath();
+            File targetFile = new File(targetFilePath);
 			File tempFile = new File(tempFilePath);
 
 			FileUtils.copyDirectory(tempFile, targetFile);
@@ -211,39 +237,38 @@ public class VideoInfoFilePostServiceImpl implements VideoInfoFilePostService {
 			// 生成Ts
 			convert2Ts(completeFilePath);
 		}catch (Exception e) {
-			//转码失败更新状态
-			updateFilePost.setTransferResult(VideoFileTransferResultEnum.FAILED.getStatus());
-			log.error("文件转码失败", e);
-		}finally {
-			videoInfoFilePostMapper.updateByUploadIdAndUserId(updateFilePost, transferVideo.getUploadId(), transferVideo.getUserId());
-			//检查是否全部转码完毕,设置文件持续时间总和
-			VideoInfoFilePostQuery videoInfoFilePostQuery = new VideoInfoFilePostQuery();
-			videoInfoFilePostQuery.setVideoId(transferVideo.getVideoId());
-			videoInfoFilePostQuery.setUserId(transferVideo.getUserId());
-			videoInfoFilePostQuery.setTransferResult(VideoFileTransferResultEnum.FAILED.getStatus());
-			Integer isFailedCounts = this.findCountByParam(videoInfoFilePostQuery);
-			//如果有没有转换完成的,设置转换失败
-			if (isFailedCounts > 0)
-			{
-				VideoInfoPost updateInfoPost = new VideoInfoPost();
-				updateInfoPost.setStatus(VideoStatusEnum.STATUS_1.getStatus());
-				videoInfoPostMapper.updateByVideoId(updateInfoPost,transferVideo.getVideoId());
-				return;
-			}
-			videoInfoFilePostQuery.setTransferResult(VideoFileTransferResultEnum.TRANSFER.getStatus());
-			Integer transferCount = this.findCountByParam(videoInfoFilePostQuery);
-			//转码成功
-			if (transferCount == 0)
-			{
-				//设置待审核状态
-				Integer duration = videoInfoFilePostMapper.getSumDuration(transferVideo.getVideoId());
+            // 转码失败更新状态，后续由投稿主表汇总判断整稿状态。
+            updateFilePost.setTransferResult(VideoFileTransferResultEnum.FAILED.getStatus());
+            log.error("文件转码失败", e);
+        }finally {
+            videoInfoFilePostMapper.updateByUploadIdAndUserId(updateFilePost, transferVideo.getUploadId(), transferVideo.getUserId());
+            //检查是否全部转码完毕,设置文件持续时间总和
+            VideoInfoFilePostQuery videoInfoFilePostQuery = new VideoInfoFilePostQuery();
+            videoInfoFilePostQuery.setVideoId(transferVideo.getVideoId());
+            videoInfoFilePostQuery.setUserId(transferVideo.getUserId());
+            videoInfoFilePostQuery.setTransferResult(VideoFileTransferResultEnum.FAILED.getStatus());
+            Integer isFailedCounts = this.findCountByParam(videoInfoFilePostQuery);
+            //如果有没有转换完成的,设置转换失败
+            if (isFailedCounts > 0)
+            {
+                VideoInfoPost updateInfoPost = new VideoInfoPost();
+                updateInfoPost.setStatus(VideoStatusEnum.STATUS_1.getStatus());
+                videoInfoPostMapper.updateByVideoId(updateInfoPost,transferVideo.getVideoId());
+                return;
+            }
+            videoInfoFilePostQuery.setTransferResult(VideoFileTransferResultEnum.TRANSFER.getStatus());
+            Integer transferCount = this.findCountByParam(videoInfoFilePostQuery);
+            //转码成功
+            if (transferCount == 0)
+            {
+                //设置待审核状态
+                Integer duration = videoInfoFilePostMapper.getSumDuration(transferVideo.getVideoId());
 				VideoInfoPost videoInfoPost = new VideoInfoPost();
 				videoInfoPost.setDuration(duration);
 				videoInfoPost.setStatus(VideoStatusEnum.STATUS_2.getStatus());
 				videoInfoPostMapper.updateByVideoId(videoInfoPost,transferVideo.getVideoId());
 			}
 		}
-
 	}
 	private void convert2Ts(String completeFilePath)
 	{

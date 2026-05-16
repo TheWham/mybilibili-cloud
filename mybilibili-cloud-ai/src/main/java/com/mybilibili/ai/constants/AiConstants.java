@@ -3,7 +3,7 @@ package com.mybilibili.ai.constants;
 /**
  * AI 模块内部协议常量。
  *
- * <p>这些值和前端事件、Ollama 接口、ES 查询协议绑定，放在代码里比放到配置中心更稳定。</p>
+ * <p>这些值和前端事件、模型接口、ES 查询协议绑定，放在代码里比放到配置中心更稳定。</p>
  */
 public final class AiConstants {
 
@@ -27,9 +27,9 @@ public final class AiConstants {
     public static final String SSE_FIELD_CONVERSATION_ID = "conversationId";
     public static final String SSE_FIELD_MESSAGE = "message";
 
-    public static final String OLLAMA_CHAT_API_PATH = "/api/chat";
     public static final String OLLAMA_EMBED_API_PATH = "/api/embed";
     public static final String OLLAMA_LEGACY_EMBED_API_PATH = "/api/embeddings";
+    public static final String OPENAI_CHAT_COMPLETIONS_API_PATH = "/v1/chat/completions";
 
     public static final String ES_SEARCH_PATH = "_search";
     public static final String ES_DELETE_BY_QUERY_PATH = "_delete_by_query";

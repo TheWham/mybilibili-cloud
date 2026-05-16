@@ -14,6 +14,13 @@ import java.util.Date;
 public class VideoDanmu implements Serializable {
 
     private Integer danmuId;
+
+    /**
+     * 弹幕事件 id。
+     *
+     * <p>发送入口生成，数据库建唯一索引，用来兜住 MQ 重投和消费者重试。</p>
+     */
+    private String eventId;
     private String videoId;
     private String videoUserId;
     private String fileId;
@@ -36,6 +43,14 @@ public class VideoDanmu implements Serializable {
 
     public void setDanmuId(Integer danmuId) {
         this.danmuId = danmuId;
+    }
+
+    public String getEventId() {
+        return eventId;
+    }
+
+    public void setEventId(String eventId) {
+        this.eventId = eventId;
     }
 
     public String getVideoId() {
@@ -130,6 +145,7 @@ public class VideoDanmu implements Serializable {
     public String toString() {
         return "VideoDanmu{"
                 + "danmuId='" + danmuId
+                + ", eventId='" + eventId + '\''
                 + ", videoId='" + videoId + '\''
                 + ", videoUserId='" + videoUserId + '\''
                 + ", fileId='" + fileId + '\''

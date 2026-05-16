@@ -1,6 +1,7 @@
 package com.mybilibili.base.entity.vo;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.mybilibili.base.enums.AiSubtitleIndexStatusEnum;
 import com.mybilibili.base.enums.VideoStatusEnum;
 import org.springframework.format.annotation.DateTimeFormat;
 
@@ -47,6 +48,8 @@ public class AdminVideoInfoVO implements Serializable {
     private Integer recommendType;
     private String nickName;
     private String avatar;
+    private String aiSubtitleIndexStatus;
+    private String aiSubtitleIndexStatusName;
 
     public String getStatusName() {
         if (statusName != null) {
@@ -258,5 +261,24 @@ public class AdminVideoInfoVO implements Serializable {
 
     public void setAvatar(String avatar) {
         this.avatar = avatar;
+    }
+
+    public String getAiSubtitleIndexStatus() {
+        return aiSubtitleIndexStatus;
+    }
+
+    public void setAiSubtitleIndexStatus(String aiSubtitleIndexStatus) {
+        this.aiSubtitleIndexStatus = aiSubtitleIndexStatus;
+    }
+
+    public String getAiSubtitleIndexStatusName() {
+        if (aiSubtitleIndexStatusName != null) {
+            return aiSubtitleIndexStatusName;
+        }
+        return AiSubtitleIndexStatusEnum.getDescByStatus(aiSubtitleIndexStatus);
+    }
+
+    public void setAiSubtitleIndexStatusName(String aiSubtitleIndexStatusName) {
+        this.aiSubtitleIndexStatusName = aiSubtitleIndexStatusName;
     }
 }

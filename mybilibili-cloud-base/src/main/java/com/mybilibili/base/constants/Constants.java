@@ -147,6 +147,16 @@ public class Constants {
     public static final String REDIS_AI_SUBTITLE_VECTOR_QUEUE_KEY = REDIS_PREFIX + "queue:ai:subtitle-vector";
 
     /**
+     * AI 字幕向量化死信队列，worker 多次处理失败后写入，方便人工重投。
+     */
+    public static final String REDIS_AI_SUBTITLE_VECTOR_DEAD_QUEUE_KEY = REDIS_PREFIX + "queue:ai:subtitle-vector:dead";
+
+    /**
+     * AI 字幕向量化任务状态前缀，后面拼接 videoId。
+     */
+    public static final String REDIS_AI_SUBTITLE_VECTOR_STATUS_KEY_PREFIX = REDIS_PREFIX + "ai:subtitle-vector:status:";
+
+    /**
      * Redis Lua 脚本资源路径。
      */
     public static final String REDIS_LUA_VIDEO_COIN = "lua/video_coin.lua";

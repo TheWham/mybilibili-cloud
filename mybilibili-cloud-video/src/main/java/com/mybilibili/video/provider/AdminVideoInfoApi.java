@@ -5,6 +5,7 @@ import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.VideoInfoFilePostDTO;
 import com.mybilibili.base.entity.vo.AdminVideoInfoVO;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
+import com.mybilibili.video.component.VideoRedisComponent;
 import com.mybilibili.video.entity.po.VideoInfoFilePost;
 import com.mybilibili.video.entity.po.VideoInfoPost;
 import com.mybilibili.video.entity.query.VideoInfoFilePostQuery;
@@ -13,7 +14,6 @@ import com.mybilibili.video.services.VideoInfoFilePostService;
 import com.mybilibili.video.services.VideoInfoPostService;
 import com.mybilibili.video.services.VideoInfoService;
 import jakarta.annotation.Resource;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,6 +32,8 @@ public class AdminVideoInfoApi {
 
     @Resource
     private VideoInfoService videoInfoService;
+    @Resource
+    private VideoRedisComponent videoRedisComponent;
 
     /**
      * 后台视频审核列表。
@@ -58,7 +60,9 @@ public class AdminVideoInfoApi {
         query.setOrderBy("v.last_update_time desc");
 
         PaginationResultVO<VideoInfoPost> page = videoInfoPostService.findListByPage(query);
-        return copyPage(page, AdminVideoInfoVO.class);
+        PaginationResultVO<AdminVideoInfoVO> result = copyPage(page, AdminVideoInfoVO.class);
+        fillAiSubtitleIndexStatus(result.getList());
+        return result;
     }
 
     @RequestMapping("/admin/videoInfo/loadVideoPList")
@@ -70,7 +74,6 @@ public class AdminVideoInfoApi {
         return BeanUtil.copyToList(filePostList, VideoInfoFilePostDTO.class);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     @RequestMapping("/admin/videoInfo/auditVideo")
     public void auditVideo(@RequestParam("videoId") String videoId,
                            @RequestParam("status") Integer status,
@@ -96,5 +99,20 @@ public class AdminVideoInfoApi {
         targetPage.setPageTotal(sourcePage.getPageTotal());
         targetPage.setList(BeanUtil.copyToList(sourcePage.getList(), targetClass));
         return targetPage;
+    }
+
+    /**
+     * 补充后台视频列表的 AI 字幕索引状态。
+     *
+     * <p>审核状态来自 MySQL，AI 状态来自异步 worker 写回的 Redis。两者分开展示，
+     * 能避免 worker 没启动时被误判成审核失败。</p>
+     */
+    private void fillAiSubtitleIndexStatus(List<AdminVideoInfoVO> videoList) {
+        if (videoList == null || videoList.isEmpty()) {
+            return;
+        }
+        for (AdminVideoInfoVO videoInfo : videoList) {
+            videoInfo.setAiSubtitleIndexStatus(videoRedisComponent.getAiSubtitleIndexStatus(videoInfo.getVideoId()));
+        }
     }
 }

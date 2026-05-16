@@ -1,7 +1,10 @@
 package com.mybilibili.message.mappers;
 
 import com.mybilibili.common.mappers.BaseMapper;
+import com.mybilibili.message.entity.vo.MessageTypeDataVO;
 import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /**
  * @author amani
@@ -26,6 +29,14 @@ public interface UserMessageMapper<T, R> extends BaseMapper {
 	Integer deleteByMessageId(@Param("messageId") Integer messageId);
 
 	Integer updateReadStatsBatch(@Param("query") R userMessageQuery);
+
+	/**
+	 * 按消息类型统计未读数量。
+	 *
+	 * @param userMessageQuery 统计条件，业务层会限定当前登录用户和未读状态
+	 * @return 每类消息的未读数量
+	 */
+	List<MessageTypeDataVO> selectNoReadCountGroup(@Param("query") R userMessageQuery);
 
 	T selectLatestByNoticeKey(@Param("userId") String userId,
 							  @Param("messageType") Integer messageType,

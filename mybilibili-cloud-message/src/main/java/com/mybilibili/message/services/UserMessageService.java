@@ -5,6 +5,7 @@ import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.message.entity.po.UserMessage;
 import com.mybilibili.message.entity.query.UserMessageQuery;
 import com.mybilibili.message.entity.vo.MessageNoticeVO;
+import com.mybilibili.message.entity.vo.MessageTypeDataVO;
 
 import java.util.List;
 
@@ -74,6 +75,16 @@ public interface UserMessageService {
 	 * @return 未读信息数量
 	 */
 	Integer getNoReadMessageCount(UserMessageQuery messageQuery);
+
+	/**
+	 * 按消息类型统计当前用户未读数量。
+	 *
+	 * <p>未读分组是消息中心的高频入口，直接在数据库侧 group by，避免把所有未读消息查到 JVM 里再聚合。</p>
+	 *
+	 * @param messageQuery 未读统计条件，必须包含 userId 和 readType
+	 * @return 每种消息类型对应的未读数量
+	 */
+	List<MessageTypeDataVO> getNoReadMessageCountGroup(UserMessageQuery messageQuery);
 
 	Integer updateReadStatsBatch(UserMessageQuery userMessageQuery);
 }

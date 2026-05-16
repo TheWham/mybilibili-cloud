@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -35,21 +36,46 @@ public class UserMessagePersistConsumer {
     @Resource
     private MqIdempotentComponent mqIdempotentComponent;
 
-    @RabbitListener(queues = MqConstants.USER_MESSAGE_PERSIST_QUEUE)
-    public void consumeUserMessageEvent(UserMessageEvent event) {
-        if (!validMessageEvent(event)) {
-            log.warn("用户站内信消息参数不完整，event:{}", event);
-            return;
-        }
-        if (!mqIdempotentComponent.tryStart(MqConstants.USER_MESSAGE_PERSIST_QUEUE, event.getEventId())) {
+    /**
+     * 批量消费站内信事件并落库。
+     *
+     * <p>这里仍然按 eventId 逐条做幂等锁，批量只用于减少监听回调和数据库写入次数。
+     * 如果整批落库失败，已经抢到锁的消息会释放 processing 标记，交给 RabbitMQ 后续重试。</p>
+     *
+     * @param eventList RabbitMQ 本次投递给消费者的一批站内信事件
+     */
+    @RabbitListener(queues = MqConstants.USER_MESSAGE_PERSIST_QUEUE,
+            containerFactory = "userMessageBatchRabbitListenerContainerFactory")
+    public void consumeUserMessageEvents(List<UserMessageEvent> eventList) {
+        if (eventList == null || eventList.isEmpty()) {
             return;
         }
 
+        List<UserMessage> messageList = new ArrayList<>(eventList.size());
+        List<String> processingEventIdList = new ArrayList<>(eventList.size());
         try {
-            userMessageService.addBatch(List.of(buildUserMessage(event)));
-            mqIdempotentComponent.markDone(MqConstants.USER_MESSAGE_PERSIST_QUEUE, event.getEventId());
+            for (UserMessageEvent event : eventList) {
+                if (!validMessageEvent(event)) {
+                    log.warn("用户站内信消息参数不完整，event:{}", event);
+                    continue;
+                }
+                if (!mqIdempotentComponent.tryStart(MqConstants.USER_MESSAGE_PERSIST_QUEUE, event.getEventId())) {
+                    continue;
+                }
+                processingEventIdList.add(event.getEventId());
+                messageList.add(buildUserMessage(event));
+            }
+
+            if (!messageList.isEmpty()) {
+                userMessageService.addBatch(messageList);
+            }
+            for (String eventId : processingEventIdList) {
+                mqIdempotentComponent.markDone(MqConstants.USER_MESSAGE_PERSIST_QUEUE, eventId);
+            }
         } catch (RuntimeException e) {
-            mqIdempotentComponent.release(MqConstants.USER_MESSAGE_PERSIST_QUEUE, event.getEventId());
+            for (String eventId : processingEventIdList) {
+                mqIdempotentComponent.release(MqConstants.USER_MESSAGE_PERSIST_QUEUE, eventId);
+            }
             throw e;
         }
     }

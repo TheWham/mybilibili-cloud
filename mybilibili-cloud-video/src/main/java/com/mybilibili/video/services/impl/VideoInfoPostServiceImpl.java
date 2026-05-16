@@ -3,6 +3,7 @@ package com.mybilibili.video.services.impl;
 import cn.hutool.core.bean.BeanUtil;
 import com.mybilibili.base.constants.Constants;
 import com.mybilibili.base.entity.dto.VideoInfoPostDTO;
+import com.mybilibili.base.entity.event.VideoTransferEvent;
 import com.mybilibili.base.entity.query.SimplePage;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.enums.*;
@@ -21,11 +22,14 @@ import com.mybilibili.video.entity.vo.VideoAuditCountVO;
 import com.mybilibili.video.mappers.VideoInfoFilePostMapper;
 import com.mybilibili.video.mappers.VideoInfoMapper;
 import com.mybilibili.video.mappers.VideoInfoPostMapper;
+import com.mybilibili.video.mq.producer.VideoTransferEventProducer;
 import com.mybilibili.video.services.VideoInfoPostService;
 import jakarta.annotation.Resource;
 import org.apache.commons.lang3.ArrayUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -56,6 +60,8 @@ public class VideoInfoPostServiceImpl implements VideoInfoPostService {
 	private VideoInfoMapper<VideoInfo, VideoInfoQuery> videoInfoMapper;
 	@Resource
 	private UserDailyLimitComponent userDailyLimitComponent;
+	@Resource
+	private VideoTransferEventProducer videoTransferEventProducer;
 	/**
 	 * @description 根据条件查询
 	 */
@@ -265,18 +271,14 @@ public class VideoInfoPostServiceImpl implements VideoInfoPostService {
 			videoRedisComponent.addFileList2DelQueue(videoID, filePathList);
 		}
 
-		if (addList != null && !addList.isEmpty())
-		{
-			for (VideoInfoFilePost addFile : addList)
-			{
-				addFile.setVideoId(videoID);
-				addFile.setUserId(userId);
-			}
-			videoRedisComponent.addFileList2TransferQueue(addList);
-		}
+		List<VideoTransferEvent> transferEventList = buildTransferEventList(addList, videoID, userId);
 
 		if (isNewPost) {
 			userDailyLimitComponent.recordDailyAction(userId, UserDailyLimitTypeEnum.POST_VIDEO);
+		}
+
+		if (!transferEventList.isEmpty()) {
+			registerTransferEventAfterCommit(transferEventList);
 		}
 
 	}
@@ -336,6 +338,55 @@ public class VideoInfoPostServiceImpl implements VideoInfoPostService {
 				|| !(currentVideoInfo.getIntroduction() == null ? "": currentVideoInfo.getIntroduction()).equals(videoInfoPost.getIntroduction() == null ? "" : videoInfoPost.getIntroduction())
 				|| !currentVideoInfo.getVideoCover().equals(videoInfoPost.getVideoCover())
 				|| !currentVideoInfo.getVideoName().equals(videoInfoPost.getVideoName());
+	}
+
+	/**
+	 * 为新增分 P 组装转码消息。
+	 *
+	 * <p>消息体只保留消费必须字段，消费者收到后再按 fileId 查数据库最新状态，
+	 * 避免把表结构和运行时字段全部耦合到 MQ 契约里。</p>
+	 *
+	 * @param addList 新增分 P 列表
+	 * @param videoId 视频 id
+	 * @param userId 用户 id
+	 * @return 转码事件列表
+	 */
+	private List<VideoTransferEvent> buildTransferEventList(List<VideoInfoFilePost> addList, String videoId, String userId) {
+		if (addList == null || addList.isEmpty()) {
+			return List.of();
+		}
+		List<VideoTransferEvent> transferEventList = new ArrayList<>(addList.size());
+		for (VideoInfoFilePost addFile : addList) {
+			addFile.setVideoId(videoId);
+			addFile.setUserId(userId);
+
+			VideoTransferEvent event = new VideoTransferEvent();
+			event.setEventId(StringTools.generateRandomStr(Constants.LENGTH_20));
+			event.setFileId(addFile.getFileId());
+			event.setUploadId(addFile.getUploadId());
+			event.setVideoId(videoId);
+			event.setUserId(userId);
+			transferEventList.add(event);
+		}
+		return transferEventList;
+	}
+
+	/**
+	 * 在事务提交后发送转码消息。
+	 *
+	 * <p>这里必须等数据库事务成功提交后再投递 MQ，否则会出现数据库回滚但消费者已经开始转码的脏任务。</p>
+	 *
+	 * @param transferEventList 待发送的转码消息
+	 */
+	private void registerTransferEventAfterCommit(List<VideoTransferEvent> transferEventList) {
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				for (VideoTransferEvent transferEvent : transferEventList) {
+					videoTransferEventProducer.sendTransferEvent(transferEvent);
+				}
+			}
+		});
 	}
 
 }

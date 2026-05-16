@@ -55,6 +55,21 @@ public final class MqConstants {
     public static final String VIDEO_ACTION_COUNT_ROUTING_KEY = "video.action.count";
 
     /**
+     * 视频转码事件交换机。
+     */
+    public static final String VIDEO_TRANSFER_EXCHANGE = "mybilibili.video.transfer.exchange";
+
+    /**
+     * 视频转码事件队列，由 video 服务消费。
+     */
+    public static final String VIDEO_TRANSFER_QUEUE = "mybilibili.video.transfer.queue";
+
+    /**
+     * 视频转码事件路由键。
+     */
+    public static final String VIDEO_TRANSFER_ROUTING_KEY = "video.transfer.execute";
+
+    /**
      * 用户硬币计数队列，由 user 服务消费。
      */
     public static final String USER_COIN_SYNC_QUEUE = "mybilibili.user.coin.sync.queue";

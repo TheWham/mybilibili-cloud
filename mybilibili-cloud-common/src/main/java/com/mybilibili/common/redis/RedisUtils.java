@@ -233,6 +233,53 @@ public class RedisUtils<V> {
         redisTemplate.opsForZSet().add(key, v, score);
     }
 
+    /**
+     * 写入 ZSet，并按需刷新过期时间。
+     *
+     * <p>弹幕缓存会用播放时间作为 score，这样读取时天然按视频时间轴排序。</p>
+     */
+    public Boolean zadd(String key, V value, double score, long time) {
+        try {
+            Boolean result = redisTemplate.opsForZSet().add(key, value, score);
+            if (time > 0) {
+                expire(key, time);
+            }
+            return Boolean.TRUE.equals(result);
+        } catch (Exception e) {
+            logger.error("写入 ZSet 失败, key: {}", key, e);
+            return false;
+        }
+    }
+
+    /**
+     * 按 score 正序读取 ZSet。
+     *
+     * <p>这里不做业务分页，调用方可以按具体场景决定取整段还是取时间窗口。</p>
+     */
+    public Set<V> zrange(String key, long start, long end) {
+        try {
+            Set<V> valueSet = redisTemplate.opsForZSet().range(key, start, end);
+            return valueSet == null ? Collections.emptySet() : valueSet;
+        } catch (Exception e) {
+            logger.error("读取 ZSet 失败, key: {}", key, e);
+            return Collections.emptySet();
+        }
+    }
+
+    /**
+     * 删除单个 ZSet 成员。
+     *
+     * <p>发送弹幕时如果 MQ 投递失败，需要把刚写进热缓存的成员撤掉。</p>
+     */
+    public Long zremove(String key, Object value) {
+        try {
+            return redisTemplate.opsForZSet().remove(key, value);
+        } catch (Exception e) {
+            logger.error("删除 ZSet 成员失败, key: {}", key, e);
+            return 0L;
+        }
+    }
+
     public Long zremove(String key, Object... values) {
         try {
             return redisTemplate.opsForZSet().remove(key, values);

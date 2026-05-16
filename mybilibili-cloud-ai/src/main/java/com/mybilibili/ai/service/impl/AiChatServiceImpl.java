@@ -1,5 +1,6 @@
 package com.mybilibili.ai.service.impl;
 
+import com.mybilibili.ai.client.AiChatModelClient;
 import com.mybilibili.ai.client.OllamaClient;
 import com.mybilibili.ai.config.AiProperties;
 import com.mybilibili.ai.constants.AiConstants;
@@ -38,6 +39,8 @@ public class AiChatServiceImpl implements AiChatService {
 
     @Resource
     private OllamaClient ollamaClient;
+    @Resource
+    private AiChatModelClient aiChatModelClient;
     @Resource
     private AiSubtitleVectorService aiSubtitleVectorService;
     @Resource
@@ -261,9 +264,9 @@ public class AiChatServiceImpl implements AiChatService {
                                  Consumer<String> deltaConsumer) {
         String prompt = buildPrompt(message, previousContext, sourceSuggestion, matchedVideos);
         if (deltaConsumer != null) {
-            return ollamaClient.streamChat(aiProperties.getChat().getSystemPrompt(), prompt, deltaConsumer);
+            return aiChatModelClient.streamChat(aiProperties.getChat().getSystemPrompt(), prompt, deltaConsumer);
         }
-        return ollamaClient.chat(aiProperties.getChat().getSystemPrompt(), prompt);
+        return aiChatModelClient.chat(aiProperties.getChat().getSystemPrompt(), prompt);
     }
 
     private AiSuggestionActionVO findSourceSuggestion(AiConversationContextDTO previousContext, String sourceSuggestionId) {

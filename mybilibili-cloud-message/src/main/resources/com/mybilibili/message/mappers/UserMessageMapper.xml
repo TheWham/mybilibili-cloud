@@ -105,6 +105,15 @@
 		<include refid="query_condition"/>
 	</select>
 
+	<select id="selectNoReadCountGroup" resultType="com.mybilibili.message.entity.vo.MessageTypeDataVO">
+		select
+			v.message_type as messageType,
+			count(1) as messageCount
+		from user_message v
+		<include refid="query_condition"/>
+		group by v.message_type
+	</select>
+
 	<!--插入 -->
 	<insert id="insert" parameterType="com.mybilibili.message.entity.po.UserMessage">
 		<selectKey keyProperty="bean.messageId" resultType="Integer" order="AFTER">

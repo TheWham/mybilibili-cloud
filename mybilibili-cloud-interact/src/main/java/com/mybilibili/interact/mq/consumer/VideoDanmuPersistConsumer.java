@@ -58,7 +58,8 @@ public class VideoDanmuPersistConsumer {
             }
 
             if (!danmuList.isEmpty()) {
-                videoDanmuService.addBatch(danmuList);
+                // event_id 有唯一索引，重投时走 upsert 可以避免重复弹幕，同时让后续计数重试有机会补上。
+                videoDanmuService.addOrUpdateBatch(danmuList);
                 sendDanmuVideoCountEvents(countEventList);
             }
             for (String eventId : processingEventIdList) {
@@ -138,6 +139,7 @@ public class VideoDanmuPersistConsumer {
 
     private VideoDanmu buildVideoDanmu(VideoDanmuPostEvent event) {
         VideoDanmu videoDanmu = new VideoDanmu();
+        videoDanmu.setEventId(event.getEventId());
         videoDanmu.setVideoId(event.getVideoId());
         videoDanmu.setVideoUserId(event.getVideoUserId());
         videoDanmu.setFileId(event.getFileId());
