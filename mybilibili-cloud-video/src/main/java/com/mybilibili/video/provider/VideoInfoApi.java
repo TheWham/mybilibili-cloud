@@ -8,6 +8,7 @@ import com.mybilibili.base.enums.PageSize;
 import com.mybilibili.base.enums.ResponseCodeEnum;
 import com.mybilibili.base.enums.VideoStatusEnum;
 import com.mybilibili.base.exception.BusinessException;
+import com.mybilibili.base.utils.JsonUtils;
 import com.mybilibili.video.consumer.UserVideoActionClient;
 import com.mybilibili.video.entity.dto.SeriesWithVideoQueryDTO;
 import com.mybilibili.video.entity.dto.UserVideoSeriesVideoQueryDTO;
@@ -161,7 +162,9 @@ public class VideoInfoApi{
         }
 
         PaginationResultVO<VideoInfoPost> page = videoInfoPostService.findListByPage(query);
-        return copyPage(page, VideoInfoPostDTO.class);
+        PaginationResultVO<VideoInfoPostDTO> resultPage = copyPage(page, VideoInfoPostDTO.class);
+        fillUploadFileList(resultPage.getList(), userId);
+        return resultPage;
     }
 
     /**
@@ -192,9 +195,13 @@ public class VideoInfoApi{
         fileQuery.setOrderBy("file_index asc");
         List<VideoInfoFilePost> fileList = videoInfoFilePostService.findListByParam(fileQuery);
 
+        List<VideoInfoFilePostDTO> fileDTOList = BeanUtil.copyToList(fileList, VideoInfoFilePostDTO.class);
+        VideoInfoPostDTO videoInfoDTO = BeanUtil.toBean(videoInfoPost, VideoInfoPostDTO.class);
+        videoInfoDTO.setUploadFileList(buildUploadFileListJson(fileDTOList));
+
         VideoInfoPostEditVO editVO = new VideoInfoPostEditVO();
-        editVO.setVideoInfo(BeanUtil.toBean(videoInfoPost, VideoInfoPostDTO.class));
-        editVO.setVideoInfoFileList(BeanUtil.copyToList(fileList, VideoInfoFilePostDTO.class));
+        editVO.setVideoInfo(videoInfoDTO);
+        editVO.setVideoInfoFileList(fileDTOList);
         return editVO;
     }
 
@@ -398,6 +405,55 @@ public class VideoInfoApi{
         targetPage.setPageTotal(sourcePage.getPageTotal());
         targetPage.setList(BeanUtil.copyToList(sourcePage.getList(), targetClass));
         return targetPage;
+    }
+
+    /**
+     * 回填投稿列表里的 uploadFileList。
+     *
+     * <p>投稿保存接口吃的是 uploadFileList JSON 字符串，而列表主查询只来自
+     * video_info_post。这里按当前页 videoId 批量查分 P 明细，再拼回同一个 DTO 字段，
+     * 这样列表对象被前端继续拿去编辑/提交时不会丢分 P 信息。</p>
+     *
+     * @param videoList 当前页投稿列表
+     * @param userId 当前登录用户 id，用于限制分 P 明细归属
+     */
+    private void fillUploadFileList(List<VideoInfoPostDTO> videoList, String userId) {
+        if (videoList == null || videoList.isEmpty()) {
+            return;
+        }
+
+        String[] videoIds = videoList.stream()
+                .map(VideoInfoPostDTO::getVideoId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toArray(String[]::new);
+        if (videoIds.length == 0) {
+            return;
+        }
+
+        VideoInfoFilePostQuery fileQuery = new VideoInfoFilePostQuery();
+        fileQuery.setUserId(userId);
+        fileQuery.setArrayVideoIds(videoIds);
+        fileQuery.setOrderBy("video_id asc, file_index asc");
+        List<VideoInfoFilePost> fileList = videoInfoFilePostService.findListByParam(fileQuery);
+        List<VideoInfoFilePostDTO> fileDTOList = BeanUtil.copyToList(fileList, VideoInfoFilePostDTO.class);
+        Map<String, List<VideoInfoFilePostDTO>> fileMap = fileDTOList.stream()
+                .collect(Collectors.groupingBy(VideoInfoFilePostDTO::getVideoId));
+
+        for (VideoInfoPostDTO videoInfo : videoList) {
+            List<VideoInfoFilePostDTO> currentFileList = fileMap.getOrDefault(videoInfo.getVideoId(), Collections.emptyList());
+            videoInfo.setUploadFileList(buildUploadFileListJson(currentFileList));
+        }
+    }
+
+    /**
+     * 把分 P 明细转成 postVideo 可直接接收的 uploadFileList JSON。
+     *
+     * @param fileList 分 P 明细列表，允许为空
+     * @return 分 P 明细 JSON 数组字符串
+     */
+    private String buildUploadFileListJson(List<VideoInfoFilePostDTO> fileList) {
+        return JsonUtils.convertObj2Json(fileList == null ? Collections.emptyList() : fileList);
     }
 
     private SeriesWithVideoUHomeVO toUHomeVO(SeriesWithVideoQueryDTO queryDTO) {

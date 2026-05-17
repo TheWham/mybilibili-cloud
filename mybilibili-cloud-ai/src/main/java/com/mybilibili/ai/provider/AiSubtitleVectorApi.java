@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 /**
  * AI 字幕向量内部接口。
  *
@@ -34,5 +36,35 @@ public class AiSubtitleVectorApi {
     @PostMapping("/deleteByVideoId")
     public void deleteByVideoId(@RequestParam("videoId") String videoId) {
         aiSubtitleVectorService.deleteByVideoId(videoId);
+    }
+
+    /**
+     * 按分 P 文件 ID 删除字幕向量。
+     *
+     * <p>编辑审核通过后只删除被移除或被替换的分 P 向量，其他分 P 不受影响。</p>
+     *
+     * @param fileIds 分 P 文件 ID 列表
+     */
+    @PostMapping("/deleteByFileIds")
+    public void deleteByFileIds(@RequestParam("fileIds") List<String> fileIds) {
+        aiSubtitleVectorService.deleteByFileIds(fileIds);
+    }
+
+    /**
+     * 更新字幕向量里的视频元数据。
+     *
+     * <p>视频文件没变时，审核通过只需要刷新标题、封面、标签等展示字段，不重新生成字幕向量。</p>
+     *
+     * @param videoId 视频 ID
+     * @param videoName 视频标题
+     * @param videoCover 视频封面
+     * @param tags 视频标签
+     */
+    @PostMapping("/updateVideoMetaByVideoId")
+    public void updateVideoMetaByVideoId(@RequestParam("videoId") String videoId,
+                                         @RequestParam("videoName") String videoName,
+                                         @RequestParam("videoCover") String videoCover,
+                                         @RequestParam(value = "tags", required = false) String tags) {
+        aiSubtitleVectorService.updateVideoMetaByVideoId(videoId, videoName, videoCover, tags);
     }
 }

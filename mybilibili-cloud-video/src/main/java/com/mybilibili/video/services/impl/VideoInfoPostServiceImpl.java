@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -161,7 +162,7 @@ public class VideoInfoPostServiceImpl implements VideoInfoPostService {
 		List<VideoInfoFilePost> uploadFilesInfo = JsonUtils.convertJsonArray2List(uploadFileList, VideoInfoFilePost.class);
 		boolean isNewPost = StringTools.isEmpty(videoInfoPostDTO.getVideoId());
 
-		if (uploadFilesInfo == null)
+		if (uploadFilesInfo == null || uploadFilesInfo.isEmpty())
 			throw new BusinessException(ResponseCodeEnum.CODE_600);
 		Integer limitCount = videoRedisComponent.getSysSetting().getVideoPCount();
 		if (uploadFilesInfo.size() > limitCount)
@@ -183,10 +184,10 @@ public class VideoInfoPostServiceImpl implements VideoInfoPostService {
 			VideoInfoPost videoInfoPostDb = videoInfoPostMapper.selectByVideoId(videoInfoPostDTO.getVideoId());
 			//判断修改的视频是否存在
 			if (videoInfoPostDb == null)
-				throw new BusinessException(ResponseCodeEnum.CODE_600);
-			//判断修改视频状态是否符合要求
-			if (ArrayUtils.contains(new Integer[]{VideoStatusEnum.STATUS_0.getStatus(), VideoStatusEnum.STATUS_2.getStatus()}, videoInfoPostDb.getStatus()))
-				throw new BusinessException(ResponseCodeEnum.CODE_600);
+				throw new BusinessException("投稿视频不存在");
+			// 转码中的稿件文件还没有稳定下来，不能直接编辑；待审核稿件允许继续保存，避免重复提交时报参数错误。
+			if (ArrayUtils.contains(new Integer[]{VideoStatusEnum.STATUS_0.getStatus()}, videoInfoPostDb.getStatus()))
+				throw new BusinessException("视频正在转码中，暂时不能重新发布");
 
 			VideoInfoFilePostQuery query = new VideoInfoFilePostQuery();
 			query.setVideoId(videoID);
@@ -195,14 +196,21 @@ public class VideoInfoPostServiceImpl implements VideoInfoPostService {
 			//在数据库中找到已存到数据库中视频列表
 			List<VideoInfoFilePost> filesInfoInPostDb = videoInfoFilePostMapper.selectList(query);
 
-			//将修改后文件列表
-			Map<String, VideoInfoFilePost> videoInfoFileReflect = uploadFilesInfo.stream()
-					.collect(Collectors.toMap(item -> item.getUploadId(), Function.identity(), (ans1, ans2) -> ans2));
+			// 编辑旧分 P 时 fileId 才是最稳定的身份标识；uploadId 只作为历史数据兜底。
+			Map<String, VideoInfoFilePost> videoInfoFileByFileId = uploadFilesInfo.stream()
+					.filter(item -> !StringTools.isEmpty(item.getFileId()))
+					.collect(Collectors.toMap(VideoInfoFilePost::getFileId, Function.identity(), (ans1, ans2) -> ans2));
+			Map<String, VideoInfoFilePost> videoInfoFileByUploadId = uploadFilesInfo.stream()
+					.filter(item -> !StringTools.isEmpty(item.getUploadId()))
+					.collect(Collectors.toMap(VideoInfoFilePost::getUploadId, Function.identity(), (ans1, ans2) -> ans2));
 
 			Boolean isUpdateFileName = false;
 			for (VideoInfoFilePost filePost : filesInfoInPostDb)
 			{
-				VideoInfoFilePost isInDb = videoInfoFileReflect.get(filePost.getUploadId());
+				VideoInfoFilePost isInDb = videoInfoFileByFileId.get(filePost.getFileId());
+				if (isInDb == null) {
+					isInDb = videoInfoFileByUploadId.get(filePost.getUploadId());
+				}
 				//在修改视频文件列表中找出被删除了视频文件
 				if (isInDb == null)
 				{
@@ -211,7 +219,7 @@ public class VideoInfoPostServiceImpl implements VideoInfoPostService {
 				}
 
 				//判断是否有文件名改变
-				if (isInDb != null && !isInDb.getFileName().equals(videoInfoFileReflect.get(isInDb.getUploadId()).getFileName()))
+				if (!Objects.equals(filePost.getFileName(), isInDb.getFileName()))
 				{
 					isUpdateFileName = true;
 				}
@@ -223,7 +231,7 @@ public class VideoInfoPostServiceImpl implements VideoInfoPostService {
 			Boolean changeVideoInfoPost = isChangeVideoInfoPost(videoInfoPostDTO);
 
 			//通过新提交的文件中找到没有fileId的新增文件
-			addList = uploadFilesInfo.stream().filter(fileInfo -> fileInfo.getFileId() == null).collect(Collectors.toList());
+			addList = uploadFilesInfo.stream().filter(fileInfo -> StringTools.isEmpty(fileInfo.getFileId())).collect(Collectors.toList());
 
 			if (addList != null && addList.isEmpty())
 			{

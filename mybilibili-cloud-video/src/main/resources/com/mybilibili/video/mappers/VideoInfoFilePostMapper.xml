@@ -47,6 +47,12 @@
 		<if test="query.videoId != null and query.videoId != ''" >
 			and video_id = #{query.videoId}
 		</if>
+		<if test="query.arrayVideoIds != null and query.arrayVideoIds.length > 0">
+			and video_id in
+			<foreach collection="query.arrayVideoIds" item="videoId" open="(" separator="," close=")">
+				#{videoId}
+			</foreach>
+		</if>
 		<if test="query.fileName != null and query.fileName != ''" >
 			and file_name = #{query.fileName}
 		</if>

@@ -346,8 +346,6 @@ public class AiProperties {
         private Long sessionExpireMs = 86400000L;
         @Min(1)
         private Integer fixedAnswerChunkSize = 16;
-        @Min(1)
-        private Integer shortKeywordLength = 2;
 
         public String getSystemPrompt() {
             return systemPrompt;
@@ -405,13 +403,6 @@ public class AiProperties {
             this.fixedAnswerChunkSize = fixedAnswerChunkSize;
         }
 
-        public Integer getShortKeywordLength() {
-            return shortKeywordLength;
-        }
-
-        public void setShortKeywordLength(Integer shortKeywordLength) {
-            this.shortKeywordLength = shortKeywordLength;
-        }
     }
 
     public static class Embedding {
@@ -450,6 +441,12 @@ public class AiProperties {
         private Double titlePhraseBoost = 5D;
         @DecimalMin("0.0")
         private Double titleAndBoost = 2D;
+        @DecimalMin("0.0")
+        private Double titleOrBoost = 0.6D;
+        @DecimalMin("0.0")
+        private Double tagPhraseBoost = 5D;
+        @DecimalMin("0.0")
+        private Double tagAndBoost = 2D;
         @DecimalMin(value = "0.0", inclusive = false)
         private Double keywordScoreDivisor = 10D;
         @DecimalMin("0.0")
@@ -458,6 +455,12 @@ public class AiProperties {
         @DecimalMin("0.0")
         @DecimalMax("1.0")
         private Double titleScoreMax = 0.7D;
+        @DecimalMin("0.0")
+        @DecimalMax("1.0")
+        private Double tagScoreMin = 0.4D;
+        @DecimalMin("0.0")
+        @DecimalMax("1.0")
+        private Double tagScoreMax = 0.7D;
 
         public Integer getCandidateMultiplier() {
             return candidateMultiplier;
@@ -499,6 +502,30 @@ public class AiProperties {
             this.titleAndBoost = titleAndBoost;
         }
 
+        public Double getTitleOrBoost() {
+            return titleOrBoost;
+        }
+
+        public void setTitleOrBoost(Double titleOrBoost) {
+            this.titleOrBoost = titleOrBoost;
+        }
+
+        public Double getTagPhraseBoost() {
+            return tagPhraseBoost;
+        }
+
+        public void setTagPhraseBoost(Double tagPhraseBoost) {
+            this.tagPhraseBoost = tagPhraseBoost;
+        }
+
+        public Double getTagAndBoost() {
+            return tagAndBoost;
+        }
+
+        public void setTagAndBoost(Double tagAndBoost) {
+            this.tagAndBoost = tagAndBoost;
+        }
+
         public Double getKeywordScoreDivisor() {
             return keywordScoreDivisor;
         }
@@ -523,9 +550,30 @@ public class AiProperties {
             this.titleScoreMax = titleScoreMax;
         }
 
+        public Double getTagScoreMin() {
+            return tagScoreMin;
+        }
+
+        public void setTagScoreMin(Double tagScoreMin) {
+            this.tagScoreMin = tagScoreMin;
+        }
+
+        public Double getTagScoreMax() {
+            return tagScoreMax;
+        }
+
+        public void setTagScoreMax(Double tagScoreMax) {
+            this.tagScoreMax = tagScoreMax;
+        }
+
         @AssertTrue(message = "titleScoreMin 不能大于 titleScoreMax")
         public boolean isTitleScoreRangeValid() {
             return titleScoreMin == null || titleScoreMax == null || titleScoreMin <= titleScoreMax;
+        }
+
+        @AssertTrue(message = "tagScoreMin 不能大于 tagScoreMax")
+        public boolean isTagScoreRangeValid() {
+            return tagScoreMin == null || tagScoreMax == null || tagScoreMin <= tagScoreMax;
         }
     }
 

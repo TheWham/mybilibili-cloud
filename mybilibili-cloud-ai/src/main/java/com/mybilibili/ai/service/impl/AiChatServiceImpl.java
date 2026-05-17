@@ -10,6 +10,7 @@ import com.mybilibili.ai.entity.dto.AiChatRequestDTO;
 import com.mybilibili.ai.entity.dto.AiConversationContextDTO;
 import com.mybilibili.ai.entity.vo.AiChatResultVO;
 import com.mybilibili.ai.entity.vo.AiChatSessionSummaryVO;
+import com.mybilibili.ai.entity.vo.AiMatchDetailVO;
 import com.mybilibili.ai.entity.vo.AiMatchedVideoVO;
 import com.mybilibili.ai.entity.vo.AiQueryAnalysisVO;
 import com.mybilibili.ai.entity.vo.AiSuggestionActionVO;
@@ -30,7 +31,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -48,7 +48,8 @@ public class AiChatServiceImpl implements AiChatService {
     private static final Logger log = LoggerFactory.getLogger(AiChatServiceImpl.class);
 
     private static final String ANALYSIS_RESPONSE_EXAMPLE = "{\"intentType\":\"video_search\","
-            + "\"searchKeyword\":\"流浪地球 科幻电影 相关片段\",\"needClarification\":false,"
+            + "\"searchKeyword\":\"流浪地球 科幻电影 相关片段\","
+            + "\"metadataKeywords\":[\"流浪地球\"],\"needClarification\":false,"
             + "\"clarificationQuestion\":\"\",\"confidence\":0.92,"
             + "\"explanation\":\"用户想找和流浪地球有关的视频片段\"}";
 
@@ -142,6 +143,7 @@ public class AiChatServiceImpl implements AiChatService {
         queryAnalysis.setOriginalQuestion("");
         queryAnalysis.setIntentType(AiConstants.INTENT_TYPE_UNKNOWN);
         queryAnalysis.setSearchKeyword("");
+        queryAnalysis.setMetadataKeywords(Collections.emptyList());
         queryAnalysis.setNeedClarification(Boolean.FALSE);
         queryAnalysis.setClarificationQuestion("");
         queryAnalysis.setConfidence(1.0D);
@@ -196,7 +198,7 @@ public class AiChatServiceImpl implements AiChatService {
         String searchKeyword = resolveQueryKeyword(queryAnalysis, message);
         List<Double> queryVector = buildQueryVector(searchKeyword);
         long embeddingEndTime = System.currentTimeMillis();
-        List<AiMatchedVideoVO> searchedVideos = searchVideosByIntent(queryAnalysis, searchKeyword, queryVector, topK);
+        List<AiMatchedVideoVO> searchedVideos = searchVideosByIntent(message, queryAnalysis, searchKeyword, queryVector, topK);
         long searchEndTime = System.currentTimeMillis();
 
         /*
@@ -225,38 +227,14 @@ public class AiChatServiceImpl implements AiChatService {
         }
 
         List<AiMatchedVideoVO> subtitleMatches = filterSubtitleMatches(matchedVideos);
-        List<AiMatchedVideoVO> titleMatches = filterTitleMatches(matchedVideos);
-        if (!titleMatches.isEmpty() && isShortKeyword(searchKeyword)
-                && !hasSubtitleKeywordHit(subtitleMatches, searchKeyword)) {
-            /*
-             * 短词很容易被语义检索带偏。没有字幕文本直接包含关键词时，
-             * 优先展示标题相关结果，别把弱相关字幕喂给模型硬组织答案。
-             */
-            resultVO.setVideos(titleMatches);
-            String answer = buildTitleMatchAnswer(message, queryAnalysis, titleMatches);
-            sendFixedAnswer(deltaConsumer, answer);
-            fillResult(resultVO, message, answer, queryAnalysis, titleMatches,
-                    buildFollowUpSuggestionActions(message, titleMatches));
-            saveChatRound(safeRequest, conversationId, message, resultVO);
-            log.info(
-                    "AI 问答返回短词标题匹配, message={}, searchKeyword={}, conversationId={}, titleCount={}, totalCost={}ms",
-                    message,
-                    searchKeyword,
-                    conversationId,
-                    titleMatches.size(),
-                    System.currentTimeMillis() - startTime
-            );
-            return resultVO;
-        }
-
         if (subtitleMatches.isEmpty()) {
-            String answer = buildTitleMatchAnswer(message, queryAnalysis, matchedVideos);
+            String answer = buildMetadataMatchAnswer(message, queryAnalysis, matchedVideos);
             sendFixedAnswer(deltaConsumer, answer);
             fillResult(resultVO, message, answer, queryAnalysis, matchedVideos,
                     buildFollowUpSuggestionActions(message, matchedVideos));
             saveChatRound(safeRequest, conversationId, message, resultVO);
             log.info(
-                    "AI 问答返回标题匹配, message={}, searchKeyword={}, conversationId={}, matchedCount={}, embeddingCost={}ms, searchCost={}ms, totalCost={}ms",
+                    "AI 问答返回视频元数据匹配, message={}, searchKeyword={}, conversationId={}, matchedCount={}, embeddingCost={}ms, searchCost={}ms, totalCost={}ms",
                     message,
                     searchKeyword,
                     conversationId,
@@ -332,12 +310,15 @@ public class AiChatServiceImpl implements AiChatService {
      * <p>第二版仍复用现有 ES 检索实现，当前 title/subtitle/hybrid 的差异主要体现在
      * 返回给前端的意图表达和命中来源标识上，避免把协议先做复杂。</p>
      */
-    private List<AiMatchedVideoVO> searchVideosByIntent(AiQueryAnalysisVO queryAnalysis,
+    private List<AiMatchedVideoVO> searchVideosByIntent(String rawMessage,
+                                                        AiQueryAnalysisVO queryAnalysis,
                                                         String searchKeyword,
                                                         List<Double> queryVector,
                                                         int topK) {
         List<AiMatchedVideoVO> searchedVideos = aiSubtitleVectorService.search(
                 searchKeyword,
+                rawMessage,
+                queryAnalysis == null ? Collections.emptyList() : queryAnalysis.getMetadataKeywords(),
                 queryVector,
                 topK,
                 aiProperties.getRag().getMinScore()
@@ -357,6 +338,10 @@ public class AiChatServiceImpl implements AiChatService {
             }
             if (AiConstants.MATCH_TYPE_TITLE.equals(video.getMatchType())) {
                 video.setMatchSource(AiConstants.MATCH_SOURCE_TITLE);
+                continue;
+            }
+            if (AiConstants.MATCH_TYPE_TAG.equals(video.getMatchType())) {
+                video.setMatchSource(AiConstants.MATCH_SOURCE_TAG);
                 continue;
             }
             if (AiConstants.INTENT_TYPE_VIDEO_SUBTITLE_SEARCH.equals(intentType)) {
@@ -430,10 +415,13 @@ public class AiChatServiceImpl implements AiChatService {
         if (previousContext != null && previousContext.getQueryAnalysis() != null
                 && StringUtils.isNotBlank(previousContext.getQueryAnalysis().getSearchKeyword())) {
             analysis.setSearchKeyword(previousContext.getQueryAnalysis().getSearchKeyword());
+            analysis.setMetadataKeywords(previousContext.getQueryAnalysis().getMetadataKeywords());
         } else if (previousContext != null && StringUtils.isNotBlank(previousContext.getLastQuestion())) {
             analysis.setSearchKeyword(previousContext.getLastQuestion());
+            analysis.setMetadataKeywords(List.of(previousContext.getLastQuestion()));
         } else {
             analysis.setSearchKeyword(message);
+            analysis.setMetadataKeywords(List.of(message));
         }
         analysis.setNeedClarification(Boolean.FALSE);
         analysis.setClarificationQuestion("");
@@ -445,9 +433,14 @@ public class AiChatServiceImpl implements AiChatService {
     private String buildQueryAnalysisPrompt(String message, AiConversationContextDTO previousContext) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("请分析用户当前问题，并输出 JSON。")
-                .append("JSON 字段固定为 intentType、searchKeyword、needClarification、clarificationQuestion、confidence、explanation。")
+                .append("JSON 字段固定为 intentType、searchKeyword、metadataKeywords、needClarification、clarificationQuestion、confidence、explanation。")
                 .append("其中 needClarification 为 true 时，不要生成宽泛检索词，要直接给出追问文案。")
                 .append("searchKeyword 要适合做视频字幕向量检索，尽量保留主题、片名、类型、业务词，不要带客套话。")
+                .append("metadataKeywords 用于标题和标签检索，必须短而精确；")
+                .append("要保留用户原话里的英文缩写、数字、专有名词、片名和标签词，")
+                .append("不要加入“相关视频”“相关片段”“内容”等泛词。")
+                .append("例如用户问“查找f1相关的视频”，searchKeyword 可以是“F1 赛车 一级方程式 相关片段”，")
+                .append("metadataKeywords 必须包含“f1”。")
                 .append("clarificationQuestion 和 explanation 控制在")
                 .append(aiProperties.getChat().getQueryAnalysisMaxWords())
                 .append("字以内。")
@@ -473,11 +466,56 @@ public class AiChatServiceImpl implements AiChatService {
         analysis.setOriginalQuestion(message);
         analysis.setIntentType(root.path("intentType").asText(""));
         analysis.setSearchKeyword(root.path("searchKeyword").asText(""));
+        analysis.setMetadataKeywords(parseMetadataKeywords(root.path("metadataKeywords")));
         analysis.setNeedClarification(root.path("needClarification").asBoolean(false));
         analysis.setClarificationQuestion(root.path("clarificationQuestion").asText(""));
         analysis.setConfidence(root.path("confidence").asDouble(0.0D));
         analysis.setExplanation(root.path("explanation").asText(""));
         return analysis;
+    }
+
+    /**
+     * 读取模型返回的标题/标签短关键词。
+     *
+     * <p>模型偶尔会把数组返回成逗号分隔字符串，这里做一层兼容，保证旧模型或临时提示词波动时
+     * 后续元数据召回仍然有可用关键词。</p>
+     *
+     * @param metadataKeywordsNode JSON 中的 metadataKeywords 字段
+     * @return 清洗后的短关键词列表
+     */
+    private List<String> parseMetadataKeywords(JsonNode metadataKeywordsNode) {
+        if (metadataKeywordsNode == null || metadataKeywordsNode.isMissingNode() || metadataKeywordsNode.isNull()) {
+            return Collections.emptyList();
+        }
+        List<String> metadataKeywords = new ArrayList<>();
+        if (metadataKeywordsNode.isArray()) {
+            for (JsonNode keywordNode : metadataKeywordsNode) {
+                addMetadataKeyword(metadataKeywords, keywordNode.asText(""));
+            }
+            return metadataKeywords;
+        }
+        String text = metadataKeywordsNode.asText("");
+        if (StringUtils.isBlank(text)) {
+            return Collections.emptyList();
+        }
+        String[] keywords = text.split("[,，、\\s]+");
+        for (String keyword : keywords) {
+            addMetadataKeyword(metadataKeywords, keyword);
+        }
+        return metadataKeywords;
+    }
+
+    private void addMetadataKeyword(List<String> metadataKeywords, String keyword) {
+        String trimmedKeyword = StringUtils.trimToEmpty(keyword);
+        if (StringUtils.isBlank(trimmedKeyword)) {
+            return;
+        }
+        for (String existingKeyword : metadataKeywords) {
+            if (StringUtils.equalsIgnoreCase(existingKeyword, trimmedKeyword)) {
+                return;
+            }
+        }
+        metadataKeywords.add(trimmedKeyword);
     }
 
     private void normalizeQueryAnalysis(AiQueryAnalysisVO analysis, String message) {
@@ -493,6 +531,7 @@ public class AiChatServiceImpl implements AiChatService {
                 analysis.setClarificationQuestion("你想找哪一类视频？可以告诉我片名、类型、演员、剧情关键词或你记得的片段。");
             }
             analysis.setSearchKeyword("");
+            analysis.setMetadataKeywords(Collections.emptyList());
         } else if (StringUtils.isBlank(analysis.getSearchKeyword())) {
             analysis.setSearchKeyword(message);
         }
@@ -540,6 +579,7 @@ public class AiChatServiceImpl implements AiChatService {
         analysis.setOriginalQuestion(message);
         analysis.setIntentType(AiConstants.INTENT_TYPE_UNKNOWN);
         analysis.setSearchKeyword(message);
+        analysis.setMetadataKeywords(List.of(message));
         analysis.setNeedClarification(Boolean.FALSE);
         analysis.setClarificationQuestion("");
         analysis.setConfidence(0.0D);
@@ -671,9 +711,12 @@ public class AiChatServiceImpl implements AiChatService {
             if (video == null || StringUtils.isBlank(video.getVideoId())) {
                 continue;
             }
-            String key = video.getVideoId() + ":" + StringUtils.defaultString(video.getMatchType()) + ":"
-                    + StringUtils.defaultString(video.getMatchedText());
-            target.putIfAbsent(key, video);
+            AiMatchedVideoVO existingVideo = target.get(video.getVideoId());
+            if (existingVideo == null) {
+                target.put(video.getVideoId(), video);
+                continue;
+            }
+            mergeMatchDetails(existingVideo, video);
         }
     }
 
@@ -683,42 +726,64 @@ public class AiChatServiceImpl implements AiChatService {
         }
         List<AiMatchedVideoVO> subtitleMatches = new ArrayList<>();
         for (AiMatchedVideoVO matchedVideo : matchedVideos) {
-            if (!AiConstants.MATCH_TYPE_TITLE.equals(matchedVideo.getMatchType())) {
-                subtitleMatches.add(matchedVideo);
+            if (matchedVideo == null) {
+                continue;
+            }
+            if (matchedVideo.getMatchDetails() == null || matchedVideo.getMatchDetails().isEmpty()) {
+                if (AiConstants.MATCH_TYPE_SUBTITLE.equals(matchedVideo.getMatchType())) {
+                    subtitleMatches.add(matchedVideo);
+                }
+                continue;
+            }
+            for (AiMatchDetailVO detail : matchedVideo.getMatchDetails()) {
+                if (detail != null && AiConstants.MATCH_TYPE_SUBTITLE.equals(detail.getMatchType())) {
+                    subtitleMatches.add(buildSubtitleEvidence(matchedVideo, detail));
+                }
             }
         }
         return subtitleMatches;
     }
 
-    private List<AiMatchedVideoVO> filterTitleMatches(List<AiMatchedVideoVO> matchedVideos) {
-        if (matchedVideos == null || matchedVideos.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<AiMatchedVideoVO> titleMatches = new ArrayList<>();
-        for (AiMatchedVideoVO matchedVideo : matchedVideos) {
-            if (matchedVideo != null && AiConstants.MATCH_TYPE_TITLE.equals(matchedVideo.getMatchType())) {
-                titleMatches.add(matchedVideo);
-            }
-        }
-        return titleMatches;
+    private AiMatchedVideoVO buildSubtitleEvidence(AiMatchedVideoVO video, AiMatchDetailVO detail) {
+        AiMatchedVideoVO evidence = new AiMatchedVideoVO();
+        evidence.setVideoId(video.getVideoId());
+        evidence.setVideoName(video.getVideoName());
+        evidence.setVideoCover(video.getVideoCover());
+        evidence.setMatchedText(detail.getMatchedText());
+        evidence.setStartTime(detail.getStartTime());
+        evidence.setEndTime(detail.getEndTime());
+        evidence.setScore(detail.getScore());
+        evidence.setMatchType(detail.getMatchType());
+        evidence.setMatchSource(detail.getMatchSource());
+        evidence.setMatchDetails(List.of(detail));
+        return evidence;
     }
 
-    private boolean isShortKeyword(String keyword) {
-        return StringUtils.length(StringUtils.trimToEmpty(keyword)) <= aiProperties.getChat().getShortKeywordLength();
-    }
-
-    private boolean hasSubtitleKeywordHit(List<AiMatchedVideoVO> subtitleMatches, String keyword) {
-        if (subtitleMatches == null || subtitleMatches.isEmpty() || StringUtils.isBlank(keyword)) {
-            return false;
+    private void mergeMatchDetails(AiMatchedVideoVO target, AiMatchedVideoVO source) {
+        if (target.getMatchDetails() == null || target.getMatchDetails().isEmpty()) {
+            target.setMatchDetails(new ArrayList<>(source.getMatchDetails()));
+            return;
         }
-        String lowerKeyword = keyword.toLowerCase(Locale.ROOT);
-        for (AiMatchedVideoVO matchedVideo : subtitleMatches) {
-            String matchedText = matchedVideo == null ? null : matchedVideo.getMatchedText();
-            if (StringUtils.contains(StringUtils.lowerCase(matchedText, Locale.ROOT), lowerKeyword)) {
-                return true;
+        if (source.getMatchDetails() == null || source.getMatchDetails().isEmpty()) {
+            return;
+        }
+        for (AiMatchDetailVO sourceDetail : source.getMatchDetails()) {
+            if (sourceDetail == null || StringUtils.isBlank(sourceDetail.getMatchType())
+                    || StringUtils.isBlank(sourceDetail.getMatchedText())) {
+                continue;
+            }
+            boolean exists = false;
+            for (AiMatchDetailVO targetDetail : target.getMatchDetails()) {
+                if (sourceDetail.getMatchType().equals(targetDetail.getMatchType())
+                        && sourceDetail.getMatchedText().equals(targetDetail.getMatchedText())) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                target.getMatchDetails().add(sourceDetail);
             }
         }
-        return false;
     }
 
     private String buildPrompt(String message,
@@ -784,21 +849,21 @@ public class AiChatServiceImpl implements AiChatService {
         return answer.toString();
     }
 
-    private String buildTitleMatchAnswer(String keyword, AiQueryAnalysisVO queryAnalysis, List<AiMatchedVideoVO> matchedVideos) {
+    private String buildMetadataMatchAnswer(String keyword, AiQueryAnalysisVO queryAnalysis, List<AiMatchedVideoVO> matchedVideos) {
         StringBuilder answer = new StringBuilder();
         answer.append("没有找到和“").append(keyword).append("”直接匹配的字幕片段，");
         if (queryAnalysis != null && StringUtils.isNotBlank(queryAnalysis.getSearchKeyword())
                 && !StringUtils.equals(keyword, queryAnalysis.getSearchKeyword())) {
             answer.append("我按“").append(queryAnalysis.getSearchKeyword()).append("”做了一次更聚焦的检索，");
         }
-        answer.append("但找到了标题相关的视频：");
+        answer.append("但找到了标题或标签相关的视频：");
         for (int i = 0; i < matchedVideos.size(); i++) {
             if (i > 0) {
                 answer.append("、");
             }
             answer.append("《").append(matchedVideos.get(i).getVideoName()).append("》");
         }
-        answer.append("。这些结果只按标题相关展示，没有当作字幕命中喂给 AI。");
+        answer.append("。这些结果只按视频元数据相关展示，没有当作字幕命中喂给 AI。");
         return answer.toString();
     }
 

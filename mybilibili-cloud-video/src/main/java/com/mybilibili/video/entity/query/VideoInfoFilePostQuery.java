@@ -29,6 +29,13 @@ public class VideoInfoFilePostQuery extends BaseQuery {
 	private String videoId;
 	private String videoIdFuzzy;
 	/**
+	 * 视频 id 批量查询条件。
+	 *
+	 * <p>用户中心投稿列表回填分 P 信息时，一页会有多个视频。用这个字段一次查出
+	 * 当前页所有分 P，避免按 videoId 循环查库。</p>
+	 */
+	private String[] arrayVideoIds;
+	/**
 	 * @description 文件名
 	 */
 	private String fileName;
@@ -86,6 +93,12 @@ public class VideoInfoFilePostQuery extends BaseQuery {
 	}
 	public String getVideoId() {
 		return this.videoId;
+	}
+	public String[] getArrayVideoIds() {
+		return arrayVideoIds;
+	}
+	public void setArrayVideoIds(String[] arrayVideoIds) {
+		this.arrayVideoIds = arrayVideoIds;
 	}
 	public void setFileName(String fileName) {
 		this.fileName = fileName;

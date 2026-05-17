@@ -12,9 +12,11 @@ public final class AiConstants {
 
     public static final String MATCH_TYPE_SUBTITLE = "subtitle";
     public static final String MATCH_TYPE_TITLE = "title";
+    public static final String MATCH_TYPE_TAG = "tag";
     public static final String MATCH_SOURCE_VECTOR = "vector";
     public static final String MATCH_SOURCE_SUBTITLE = "subtitle";
     public static final String MATCH_SOURCE_TITLE = "title";
+    public static final String MATCH_SOURCE_TAG = "tag";
     public static final String MATCH_SOURCE_HYBRID = "hybrid";
 
     public static final String SUGGESTION_TYPE_CONTINUE = "continue";
@@ -53,6 +55,7 @@ public final class AiConstants {
 
     public static final String ES_SEARCH_PATH = "_search";
     public static final String ES_DELETE_BY_QUERY_PATH = "_delete_by_query";
+    public static final String ES_UPDATE_BY_QUERY_PATH = "_update_by_query";
     public static final String ES_CONFLICTS_PARAM = "conflicts";
     public static final String ES_CONFLICTS_PROCEED = "proceed";
     public static final String ES_CONTENT_VECTOR_FIELD = "contentVector";

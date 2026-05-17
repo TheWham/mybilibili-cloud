@@ -12,6 +12,8 @@ import com.mybilibili.user.services.UserInfoService;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,6 +30,20 @@ public class UCenterController extends ABaseController {
 
     @Resource
     private UserInfoService userInfoService;
+
+    /**
+     * 投稿保存只接收用户可编辑字段。
+     *
+     * <p>列表和详情回显里会带 createTime、status 等服务端字段，前端整对象提交时容易触发表单绑定错误。
+     * 这里直接屏蔽这些字段，也避免客户端伪造状态、创建时间这类不该信任的数据。</p>
+     *
+     * @param binder 当前请求的数据绑定器
+     */
+    @InitBinder
+    public void initVideoInfoPostBinder(WebDataBinder binder) {
+        binder.setDisallowedFields("userId", "createTime", "lastUpdateTime", "status", "statusName",
+                "transferResult", "updateType", "duration");
+    }
 
 
     @RequestMapping("loadVideoList")
@@ -112,4 +128,3 @@ public class UCenterController extends ABaseController {
     }
 
 }
-

@@ -1,6 +1,8 @@
 package com.mybilibili.ai.entity.vo;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 用户提问分析结果。
@@ -24,6 +26,14 @@ public class AiQueryAnalysisVO implements Serializable {
      * 真正送去做向量检索的关键词。
      */
     private String searchKeyword;
+
+    /**
+     * 用于标题和标签检索的短关键词。
+     *
+     * <p>这类关键词需要尽量保留用户原话里的片名、英文缩写、数字和标签词，
+     * 不跟随字幕检索词做过度扩展，避免 “f1” 被扩成一整句后反而查不到标题。</p>
+     */
+    private List<String> metadataKeywords = new ArrayList<>();
 
     /**
      * 当前信息是否不足，是否需要先向用户追问。
@@ -67,6 +77,14 @@ public class AiQueryAnalysisVO implements Serializable {
 
     public void setSearchKeyword(String searchKeyword) {
         this.searchKeyword = searchKeyword;
+    }
+
+    public List<String> getMetadataKeywords() {
+        return metadataKeywords;
+    }
+
+    public void setMetadataKeywords(List<String> metadataKeywords) {
+        this.metadataKeywords = metadataKeywords == null ? new ArrayList<>() : new ArrayList<>(metadataKeywords);
     }
 
     public Boolean getNeedClarification() {

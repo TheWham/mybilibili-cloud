@@ -50,9 +50,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 
 /**
@@ -197,18 +199,27 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 			return;
 		}
 
+		VideoInfoFilePostQuery filePostQuery = new VideoInfoFilePostQuery();
+		filePostQuery.setVideoId(videoId);
+		// updateType 是判断分 P 是否需要重新向量化的依据，必须在重置为“未更新”之前读出来。
+		List<VideoInfoFilePost> filePostList = videoInfoFilePostMapper.selectList(filePostQuery);
+
+		// 这里读的是正式表旧数据，用来和本次投稿表做差集，算出被删除/替换的 fileId。
+		VideoInfo oldVideoInfo = this.videoInfoMapper.selectByVideoId(videoId);
+		boolean firstAuditPass = oldVideoInfo == null;
+		VideoInfoFileQuery oldVideoInfoFileQuery = new VideoInfoFileQuery();
+		oldVideoInfoFileQuery.setVideoId(videoId);
+		List<VideoInfoFile> oldFileList = firstAuditPass ? new ArrayList<>() : videoInfoFileMapper.selectList(oldVideoInfoFileQuery);
+		List<VideoInfoFilePost> aiIndexFilePostList = buildAiIndexFilePostList(firstAuditPass, oldFileList, filePostList);
+		List<String> aiDeleteFileIds = buildAiDeleteFileIds(firstAuditPass, oldFileList, filePostList, aiIndexFilePostList);
+
 		//审核完成修改更新方式为未更新
 		VideoInfoFilePost videoInfoFilePost = new VideoInfoFilePost();
 		videoInfoFilePost.setUpdateType(VideoFileUpdateTypeEnum.UN_UPDATE.getStatus());
-		VideoInfoFilePostQuery filePostQuery = new VideoInfoFilePostQuery();
-		filePostQuery.setVideoId(videoId);
 		videoInfoFilePostMapper.updateByCondition(videoInfoFilePost, filePostQuery);
 
 		//同步信息到正式表
-		VideoInfo videoInfo = this.videoInfoMapper.selectByVideoId(videoId);
-		boolean firstAuditPass = videoInfo == null;
-
-		videoInfo = BeanUtil.toBean(videoInfoPost, VideoInfo.class);
+		VideoInfo videoInfo = BeanUtil.toBean(videoInfoPost, VideoInfo.class);
 		this.addOrUpdate(videoInfo);
 
 		//不是第一次,表示有信息新增或者修改, 需要先清空再添加
@@ -217,7 +228,6 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 		videoInfoFileMapper.deleteByCondition(videoInfoFileQuery);
 
 		//更新videoInfoFile表信息
-		List<VideoInfoFilePost> filePostList = videoInfoFilePostMapper.selectList(filePostQuery);
 		List<VideoInfoFile> videoInfoFiles = BeanUtil.copyToList(filePostList, VideoInfoFile.class);
 		videoInfoFileMapper.insertOrUpdateBatch(videoInfoFiles);
 
@@ -232,10 +242,11 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 		List<String> deleteFilePathList = videoRedisComponent.getDelFilePathsQueue(videoId);
 		videoRedisComponent.cleanDelFilePaths(videoId);
 		VideoInfo auditedVideoInfo = videoInfo;
-		List<VideoInfoFilePost> auditedFilePostList = filePostList;
+		List<VideoInfoFilePost> auditedAiIndexFilePostList = aiIndexFilePostList;
+		List<String> auditedAiDeleteFileIds = aiDeleteFileIds;
 		Integer auditedRewardCoinCount = auditRewardCoinCount;
-		registerAfterCommit(() -> handleAuditPassAfterCommit(auditedVideoInfo, auditedFilePostList,
-				videoInfoPost, status, reason, auditedRewardCoinCount, deleteFilePathList));
+		registerAfterCommit(() -> handleAuditPassAfterCommit(auditedVideoInfo, auditedAiIndexFilePostList,
+				auditedAiDeleteFileIds, videoInfoPost, status, reason, auditedRewardCoinCount, deleteFilePathList));
 	}
 
 	@Override
@@ -400,13 +411,120 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 	}
 
 	/**
+	 * 计算本次审核通过后需要投递 AI 字幕向量化的分 P。
+	 *
+	 * <p>fileId 是分 P 内容身份：正式表已有且 updateType 仍是未更新，说明视频文件没有变化，
+	 * 只需要保留原向量；首次审核、补新增分 P、替换分 P 才需要重新投递 worker。</p>
+	 *
+	 * @param firstAuditPass 是否首次审核通过
+	 * @param oldFileList 正式表旧分 P
+	 * @param filePostList 本次投稿表分 P
+	 * @return 需要重新生成字幕向量的分 P
+	 */
+	private List<VideoInfoFilePost> buildAiIndexFilePostList(boolean firstAuditPass,
+															 List<VideoInfoFile> oldFileList,
+															 List<VideoInfoFilePost> filePostList) {
+		List<VideoInfoFilePost> result = new ArrayList<>();
+		if (filePostList == null || filePostList.isEmpty()) {
+			return result;
+		}
+		if (firstAuditPass) {
+			result.addAll(filePostList);
+			return result;
+		}
+
+		Set<String> oldFileIds = collectFormalFileIds(oldFileList);
+		for (VideoInfoFilePost filePost : filePostList) {
+			String fileId = filePost.getFileId();
+			if (!hasText(fileId)) {
+				continue;
+			}
+			boolean newFile = !oldFileIds.contains(fileId);
+			boolean updatedFile = VideoFileUpdateTypeEnum.UPDATE.getStatus().equals(filePost.getUpdateType());
+			if (newFile || updatedFile) {
+				result.add(filePost);
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * 计算需要从 ES 中删除字幕向量的 fileId。
+	 *
+	 * <p>删除分 P 时，旧 fileId 不会再出现在投稿表；替换分 P 时通常会生成新的 fileId。
+	 * 另外保守处理一下“fileId 没变但 updateType 标记更新”的情况，先删旧片段再重新入队，避免旧字幕残留。</p>
+	 *
+	 * @param firstAuditPass 是否首次审核通过
+	 * @param oldFileList 正式表旧分 P
+	 * @param filePostList 本次投稿表分 P
+	 * @param aiIndexFilePostList 本次会重新投递向量化的分 P
+	 * @return 需要删除字幕向量的 fileId
+	 */
+	private List<String> buildAiDeleteFileIds(boolean firstAuditPass,
+											  List<VideoInfoFile> oldFileList,
+											  List<VideoInfoFilePost> filePostList,
+											  List<VideoInfoFilePost> aiIndexFilePostList) {
+		List<String> result = new ArrayList<>();
+		if (firstAuditPass) {
+			return result;
+		}
+
+		Set<String> oldFileIds = collectFormalFileIds(oldFileList);
+		Set<String> postFileIds = collectPostFileIds(filePostList);
+		for (String oldFileId : oldFileIds) {
+			if (!postFileIds.contains(oldFileId)) {
+				result.add(oldFileId);
+			}
+		}
+		for (VideoInfoFilePost filePost : aiIndexFilePostList) {
+			String fileId = filePost.getFileId();
+			if (oldFileIds.contains(fileId) && !result.contains(fileId)) {
+				result.add(fileId);
+			}
+		}
+		return result;
+	}
+
+	private Set<String> collectFormalFileIds(List<VideoInfoFile> fileList) {
+		Set<String> fileIds = new LinkedHashSet<>();
+		if (fileList == null || fileList.isEmpty()) {
+			return fileIds;
+		}
+		for (VideoInfoFile file : fileList) {
+			if (hasText(file.getFileId())) {
+				fileIds.add(file.getFileId());
+			}
+		}
+		return fileIds;
+	}
+
+	private Set<String> collectPostFileIds(List<VideoInfoFilePost> filePostList) {
+		Set<String> fileIds = new LinkedHashSet<>();
+		if (filePostList == null || filePostList.isEmpty()) {
+			return fileIds;
+		}
+		for (VideoInfoFilePost filePost : filePostList) {
+			if (hasText(filePost.getFileId())) {
+				fileIds.add(filePost.getFileId());
+			}
+		}
+		return fileIds;
+	}
+
+	private boolean hasText(String value) {
+		return value != null && !value.isBlank();
+	}
+
+	/**
 	 * 审核通过后的提交后处理。
 	 *
-	 * <p>这里只有“提交之后才能做”的事情：发奖励、同步搜索索引、投递 AI 字幕任务、
-	 * 发送站内信以及清理旧文件。任何一个分支失败都只记日志，不反向影响审核结果。</p>
+	 * <p>这里只有“提交之后才能做”的事情：发奖励、同步搜索索引、清理发生变化的 AI 字幕向量、
+	 * 投递新增/替换分 P 的 AI 字幕任务、发送站内信以及清理旧文件。任何一个分支失败都只记日志，
+	 * 不反向影响审核结果。</p>
 	 */
 	private void handleAuditPassAfterCommit(VideoInfo videoInfo,
-											List<VideoInfoFilePost> filePostList,
+											List<VideoInfoFilePost> aiIndexFilePostList,
+											List<String> aiDeleteFileIds,
 											VideoInfoPost videoInfoPost,
 											Integer status,
 											String reason,
@@ -414,7 +532,9 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 											List<String> deleteFilePathList) {
 		addVideoAuditRewardSilently(videoInfoPost.getUserId(), videoInfoPost.getVideoId(), rewardCoinCount);
 		saveVideoDocSilently(videoInfo);
-		enqueueAiSubtitleIndexTasks(videoInfo, filePostList);
+		deleteAiSubtitleVectorByFileIdsSilently(aiDeleteFileIds);
+		updateAiSubtitleVideoMetaSilently(videoInfo);
+		enqueueAiSubtitleIndexTasks(videoInfo, aiIndexFilePostList);
 		deleteAuditRemovedFilesSilently(deleteFilePathList);
 		userMessageEventProducer.sendAuditVideoMessage(videoInfoPost, status, reason);
 	}
@@ -473,7 +593,6 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 			return;
 		}
 		try {
-			deleteAiSubtitleVectorSilently(videoInfo.getVideoId());
 			List<AiSubtitleIndexTaskDTO> taskList = new ArrayList<>();
 			for (VideoInfoFilePost filePost : filePostList) {
 				String sourceVideoPath = adminConfig.getProjectFolder()
@@ -514,12 +633,42 @@ public class VideoInfoServiceImpl implements VideoInfoService {
 		}
 	}
 
-	private void deleteAiSubtitleVectorSilently(String videoId) {
+	/**
+	 * 删除发生变化的分 P 字幕向量。
+	 *
+	 * <p>这里按 fileId 删除，而不是按 videoId 全删。未变化分 P 的 temp.mp4 可能已经被 worker 清理，
+	 * 重新投递不仅浪费资源，还可能因为源文件不存在导致原有向量被误删后无法恢复。</p>
+	 *
+	 * @param fileIds 被删除或被替换的分 P 文件 ID
+	 */
+	private void deleteAiSubtitleVectorByFileIdsSilently(List<String> fileIds) {
+		if (fileIds == null || fileIds.isEmpty()) {
+			return;
+		}
 		try {
-			aiSubtitleVectorClient.deleteByVideoId(videoId);
+			aiSubtitleVectorClient.deleteByFileIds(fileIds);
 		} catch (Exception e) {
-			// 删除旧向量失败不能阻断新任务投递，否则 worker 在线也没有机会重建索引。
-			log.error("删除旧字幕向量失败, videoId={}", videoId, e);
+			// 删除失败不能阻断审核主流程；后续可以根据 fileId 重试清理。
+			log.error("删除分 P 字幕向量失败, fileIds={}", fileIds, e);
+		}
+	}
+
+	/**
+	 * 更新字幕向量文档中的视频展示字段。
+	 *
+	 * <p>编辑只改标题、封面、标签时不应该投递 worker。直接更新 ES 元数据，可以让 AI 检索结果展示最新视频信息。</p>
+	 *
+	 * @param videoInfo 审核通过后的正式视频信息
+	 */
+	private void updateAiSubtitleVideoMetaSilently(VideoInfo videoInfo) {
+		if (videoInfo == null) {
+			return;
+		}
+		try {
+			aiSubtitleVectorClient.updateVideoMetaByVideoId(videoInfo.getVideoId(), videoInfo.getVideoName(),
+					videoInfo.getVideoCover(), videoInfo.getTags());
+		} catch (Exception e) {
+			log.error("更新字幕向量视频信息失败, videoId={}", videoInfo.getVideoId(), e);
 		}
 	}
 
