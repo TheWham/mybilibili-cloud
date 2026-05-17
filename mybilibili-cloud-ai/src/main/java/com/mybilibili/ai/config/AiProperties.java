@@ -319,10 +319,31 @@ public class AiProperties {
 
         @NotBlank
         private String systemPrompt = "你是 MyBiliBili 的视频内容助手。回答要基于给定视频字幕片段，不要编造片段里没有的信息。";
+        /**
+         * 问题分析阶段使用的系统提示词。
+         *
+         * <p>这里要求模型只做结构化理解，不直接回答业务问题，避免把召回前置逻辑和内容生成混在一起。</p>
+         */
+        @NotBlank
+        private String queryAnalysisSystemPrompt = "你是 MyBiliBili 视频检索助手。你的任务是分析用户问题，"
+                + "识别用户想找的视频主题、片段、类型或内容，并把问题改写成更适合视频字幕向量检索的关键词。"
+                + "你必须只返回 JSON，不要输出 Markdown、解释文字或代码块。";
         @Min(1)
         private Integer answerMaxWords = 120;
+        /**
+         * 问题分析说明和追问文案的建议上限。
+         */
+        @Min(1)
+        private Integer queryAnalysisMaxWords = 60;
         @Min(1)
         private Long sseTimeoutMs = 180000L;
+        /**
+         * AI 会话在 Redis 中的过期时间，单位毫秒。
+         *
+         * <p>保留一个相对宽松的时长，避免用户中途刷新页面后立刻丢上下文。</p>
+         */
+        @Min(1)
+        private Long sessionExpireMs = 86400000L;
         @Min(1)
         private Integer fixedAnswerChunkSize = 16;
         @Min(1)
@@ -336,6 +357,14 @@ public class AiProperties {
             this.systemPrompt = systemPrompt;
         }
 
+        public String getQueryAnalysisSystemPrompt() {
+            return queryAnalysisSystemPrompt;
+        }
+
+        public void setQueryAnalysisSystemPrompt(String queryAnalysisSystemPrompt) {
+            this.queryAnalysisSystemPrompt = queryAnalysisSystemPrompt;
+        }
+
         public Integer getAnswerMaxWords() {
             return answerMaxWords;
         }
@@ -344,12 +373,28 @@ public class AiProperties {
             this.answerMaxWords = answerMaxWords;
         }
 
+        public Integer getQueryAnalysisMaxWords() {
+            return queryAnalysisMaxWords;
+        }
+
+        public void setQueryAnalysisMaxWords(Integer queryAnalysisMaxWords) {
+            this.queryAnalysisMaxWords = queryAnalysisMaxWords;
+        }
+
         public Long getSseTimeoutMs() {
             return sseTimeoutMs;
         }
 
         public void setSseTimeoutMs(Long sseTimeoutMs) {
             this.sseTimeoutMs = sseTimeoutMs;
+        }
+
+        public Long getSessionExpireMs() {
+            return sessionExpireMs;
+        }
+
+        public void setSessionExpireMs(Long sessionExpireMs) {
+            this.sessionExpireMs = sessionExpireMs;
         }
 
         public Integer getFixedAnswerChunkSize() {

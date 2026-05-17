@@ -15,6 +15,12 @@ public class AiMatchedVideoVO implements Serializable {
     private Double endTime;
     private Double score;
     private String matchType;
+    /**
+     * 命中来源。
+     *
+     * <p>用于前端展示本条结果主要来自标题、字幕、向量还是混合召回。</p>
+     */
+    private String matchSource;
 
     public String getVideoId() {
         return videoId;
@@ -78,6 +84,14 @@ public class AiMatchedVideoVO implements Serializable {
 
     public void setMatchType(String matchType) {
         this.matchType = matchType;
+    }
+
+    public String getMatchSource() {
+        return matchSource;
+    }
+
+    public void setMatchSource(String matchSource) {
+        this.matchSource = matchSource;
     }
 }
 

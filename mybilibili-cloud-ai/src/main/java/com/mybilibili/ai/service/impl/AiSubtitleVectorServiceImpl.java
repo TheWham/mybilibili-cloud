@@ -269,6 +269,7 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
             matchedVideo.setEndTime(source.path("endTime").asDouble(0D));
             matchedVideo.setScore(roundScore(cosineScore));
             matchedVideo.setMatchType(AiConstants.MATCH_TYPE_SUBTITLE);
+            matchedVideo.setMatchSource(AiConstants.MATCH_SOURCE_VECTOR);
             videoMap.put(videoId, matchedVideo);
 
             if (videoMap.size() >= limit) {
@@ -291,6 +292,7 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
             AiMatchedVideoVO matchedVideo = buildMatchedVideo(source);
             matchedVideo.setScore(normalizeKeywordScore(hit.path("_score").asDouble(0D)));
             matchedVideo.setMatchType(AiConstants.MATCH_TYPE_SUBTITLE);
+            matchedVideo.setMatchSource(AiConstants.MATCH_SOURCE_SUBTITLE);
             videoMap.put(videoId, matchedVideo);
 
             if (videoMap.size() >= limit) {
@@ -321,6 +323,7 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
             matchedVideo.setEndTime(null);
             matchedVideo.setScore(normalizeTitleScore(hit.path("_score").asDouble(0D), maxScore));
             matchedVideo.setMatchType(AiConstants.MATCH_TYPE_TITLE);
+            matchedVideo.setMatchSource(AiConstants.MATCH_SOURCE_TITLE);
             videoMap.put(videoId, matchedVideo);
 
             if (videoMap.size() >= limit) {
@@ -352,6 +355,7 @@ public class AiSubtitleVectorServiceImpl implements AiSubtitleVectorService {
         matchedVideo.setMatchedText(source.path("content").asText(""));
         matchedVideo.setStartTime(source.path("startTime").asDouble(0D));
         matchedVideo.setEndTime(source.path("endTime").asDouble(0D));
+        matchedVideo.setMatchSource(AiConstants.MATCH_SOURCE_SUBTITLE);
         return matchedVideo;
     }
 

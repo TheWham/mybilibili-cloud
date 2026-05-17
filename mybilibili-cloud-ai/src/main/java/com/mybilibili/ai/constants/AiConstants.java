@@ -12,13 +12,33 @@ public final class AiConstants {
 
     public static final String MATCH_TYPE_SUBTITLE = "subtitle";
     public static final String MATCH_TYPE_TITLE = "title";
+    public static final String MATCH_SOURCE_VECTOR = "vector";
+    public static final String MATCH_SOURCE_SUBTITLE = "subtitle";
+    public static final String MATCH_SOURCE_TITLE = "title";
+    public static final String MATCH_SOURCE_HYBRID = "hybrid";
 
     public static final String SUGGESTION_TYPE_CONTINUE = "continue";
     public static final String SUGGESTION_TYPE_VIDEO = "video";
     public static final String SUGGESTION_TYPE_MORE = "more";
     public static final String SUGGESTION_ID_PREFIX = "sug_";
 
+    public static final String INTENT_TYPE_VIDEO_SEARCH = "video_search";
+    public static final String INTENT_TYPE_VIDEO_TITLE_SEARCH = "video_title_search";
+    public static final String INTENT_TYPE_VIDEO_SUBTITLE_SEARCH = "video_subtitle_search";
+    public static final String INTENT_TYPE_VIDEO_HYBRID_SEARCH = "video_hybrid_search";
+    public static final String INTENT_TYPE_KNOWLEDGE_QUESTION = "knowledge_question";
+    public static final String INTENT_TYPE_FOLLOW_UP = "follow_up";
+    public static final String INTENT_TYPE_UNKNOWN = "unknown";
+
+    public static final String SESSION_ACTION_INIT = "init";
+    public static final String SESSION_ACTION_CHAT = "chat";
+    public static final String REDIS_KEY_AI_CHAT_SESSION = "ai:chat:session:";
+    public static final String REDIS_KEY_AI_CHAT_USER_SESSIONS = "ai:chat:user:sessions:";
+    public static final String CHAT_MESSAGE_ROLE_USER = "user";
+    public static final String CHAT_MESSAGE_ROLE_ASSISTANT = "assistant";
+
     public static final String SSE_EVENT_START = "start";
+    public static final String SSE_EVENT_WELCOME = "welcome";
     public static final String SSE_EVENT_DELTA = "delta";
     public static final String SSE_EVENT_VIDEOS = "videos";
     public static final String SSE_EVENT_SUGGESTIONS = "suggestions";
