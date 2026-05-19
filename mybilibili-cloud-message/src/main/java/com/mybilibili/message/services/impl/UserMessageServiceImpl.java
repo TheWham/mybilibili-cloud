@@ -125,8 +125,8 @@ public class UserMessageServiceImpl implements UserMessageService {
 	 * 根据 MessageId删除
 	 */
 	@Override
-	public Integer deleteUserMessageByMessageId(Integer messageId) {
-		return this.userMessageMapper.deleteByMessageId(messageId);
+	public Integer deleteUserMessageByMessageIdAndUserId(Integer messageId, String userId) {
+		return this.userMessageMapper.deleteByMessageIdAndUserId(messageId, userId);
 	}
 
 	@Override

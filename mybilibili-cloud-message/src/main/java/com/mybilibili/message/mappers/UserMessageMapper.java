@@ -26,7 +26,7 @@ public interface UserMessageMapper<T, R> extends BaseMapper {
 	/**
 	 * 根据 MessageId删除
 	 */
-	Integer deleteByMessageId(@Param("messageId") Integer messageId);
+	Integer deleteByMessageIdAndUserId(@Param("messageId") Integer messageId, @Param("userId") String userId);
 
 	Integer updateReadStatsBatch(@Param("query") R userMessageQuery);
 

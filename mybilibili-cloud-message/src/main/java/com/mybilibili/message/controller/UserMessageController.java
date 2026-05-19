@@ -1,5 +1,6 @@
 package com.mybilibili.message.controller;
 
+import com.mybilibili.base.entity.dto.TokenUserInfoDTO;
 import com.mybilibili.base.entity.vo.PaginationResultVO;
 import com.mybilibili.base.entity.vo.ResponseVO;
 import com.mybilibili.common.controller.ABaseController;
@@ -82,6 +83,14 @@ public class UserMessageController extends ABaseController {
 		userMessageQuery.setReadType(MessageReadTypeEnum.NO_READ.getType());
 		Integer count = userMessageService.updateReadStatsBatch(userMessageQuery);
 		return getSuccessResponseVO(count);
+	}
+
+	@RequestMapping("/delMessage")
+	public ResponseVO delMessage(@NotNull Integer messageId)
+	{
+		TokenUserInfoDTO tokenUserInfo = getTokenUserInfo();
+		userMessageService.deleteUserMessageByMessageIdAndUserId(messageId, tokenUserInfo.getUserId());
+		return getSuccessResponseVO(null);
 	}
 
 }

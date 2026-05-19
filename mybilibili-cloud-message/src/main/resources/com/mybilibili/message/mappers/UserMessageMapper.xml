@@ -289,8 +289,8 @@
 		limit 1
 	</select>
 	<!--根据MessageId删除 -->
-	<delete id="deleteByMessageId">
-		delete from user_message where message_id=#{messageId}
+	<delete id="deleteByMessageIdAndUserId">
+		delete from user_message where message_id=#{messageId} and user_id = #{userId}
 	</delete>
 
 	<!--根据MessageId更新 -->

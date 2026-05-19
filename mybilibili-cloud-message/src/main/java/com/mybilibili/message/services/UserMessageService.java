@@ -61,7 +61,7 @@ public interface UserMessageService {
 	/**
 	 * 根据 MessageId删除
 	 */
-	Integer deleteUserMessageByMessageId(Integer messageId);
+	Integer deleteUserMessageByMessageIdAndUserId(Integer messageId, String userId);
 
 	/**
 	 * @param list 信息列表
